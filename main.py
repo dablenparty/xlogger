@@ -23,6 +23,8 @@ BUTTON_MAP = {
     'ABS_RY': 'R_STICK_Y',
 }
 
+JOYSTICK_CUTOFF = 2000
+
 if __name__ == '__main__':
     while True:
         events = get_gamepad()
@@ -31,4 +33,8 @@ if __name__ == '__main__':
                 code = event.code
                 if 'HAT0' in event.code:
                     code += f"_{event.state}"
-                print(BUTTON_MAP.get(code, event.code), event.state)
+                converted = BUTTON_MAP.get(code, event.code)
+                if "STICK" in converted:
+                    if -JOYSTICK_CUTOFF <= event.state <= JOYSTICK_CUTOFF:
+                        continue
+                print(converted, event.state)
