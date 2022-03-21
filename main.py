@@ -1,4 +1,8 @@
-from inputs import get_gamepad
+import csv
+import os.path
+import time
+
+from inputs import get_gamepad, UnpluggedError
 
 BUTTON_MAP = {
     'BTN_NORTH': 'Y',
@@ -25,16 +29,48 @@ BUTTON_MAP = {
 
 JOYSTICK_CUTOFF = 2000
 
+# represents if a button is pressed or not
+CONTROLLER_STATE = {key: {"start": -1, "state": 0} for key in BUTTON_MAP.values()}
+
 if __name__ == '__main__':
-    while True:
-        events = get_gamepad()
-        for event in events:
-            if event.code != 'SYN_REPORT':
+    data_file = "events.csv"
+    write_header = os.path.exists(data_file)
+    with open(data_file, "a+") as csvfile:
+        csv_writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        # Write header
+        if write_header:
+            csv_writer.writerow(['time', 'event', 'hold_duration', 'value'])
+        while True:
+            try:
+                events = get_gamepad()
+            except UnpluggedError:
+                print("\rController unplugged", sep='', end='', flush=True)
+                time.sleep(0.5)
+                continue
+            for event in events:
+                if event.code == 'SYN_REPORT':
+                    continue
                 code = event.code
+                event_state = event.state
                 if 'HAT0' in event.code:
-                    code += f"_{event.state}"
+                    code += f"_{event_state}"
                 converted = BUTTON_MAP.get(code, event.code)
+                # for now, just ignore the stick events
                 if "STICK" in converted:
-                    if -JOYSTICK_CUTOFF <= event.state <= JOYSTICK_CUTOFF:
-                        continue
-                print(converted, event.state)
+                    continue
+                # if "STICK" in converted and -JOYSTICK_CUTOFF <= event.state <= JOYSTICK_CUTOFF:
+                #     continue
+                current_state = CONTROLLER_STATE.get(converted)
+                print(f"\n{converted} {event_state}")
+                if not current_state:
+                    continue
+                if event_state:
+                    if current_state["start"] == -1:
+                        current_state["start"] = time.time()
+                    current_state["state"] = event_state
+                else:
+                    if current_state and current_state["start"] != -1:
+                        hold_duration = time.time() - current_state["start"]
+                        csv_writer.writerow([time.time(), converted, hold_duration, event_state])
+                        current_state["start"] = -1
+                        current_state["state"] = event_state
