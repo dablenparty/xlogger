@@ -55,16 +55,20 @@ def main(output_file):
                 now = time.time()
                 last_state = press_times.get(event_code, {"time": -1, "state": 0})
                 down_time = last_state.get("time", -1)
-                if event.state:
+                if event.state != 0:
+                    # event state is 0 when the button is not pressed
                     if down_time == -1:
+                        # if the button is pressed for the first time, set the down time
                         last_state["time"] = now
                         last_state["state"] = event.state
                 elif down_time != -1:
+                    # the state isn't 0 and has been pressed before
                     release_time = now
                     press_state = last_state.get("state", 1)
                     last_state["time"] = -1
                     last_state["state"] = event.state
                     key = event_code
+                    # dpad events are represented by their axis, the state is the direction
                     if "HAT0" in key:
                         key += f"_{press_state}"
                     button_name = BUTTON_NAME_MAP.get(key, event_code)
