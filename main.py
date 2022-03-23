@@ -46,20 +46,20 @@ def main():
                 # for now, just ignore the stick events
                 if "STICK" in converted:
                     continue
-                current_state = controller_state.get(converted)
+                last_state = controller_state.get(converted)
                 print(f"{converted} {event_state}")
-                if not current_state:
+                if not last_state:
                     continue
                 if event_state:
-                    if current_state["start"] == -1:
-                        current_state["start"] = time.time()
-                    current_state["state"] = event_state
+                    if last_state["start"] == -1:
+                        last_state["start"] = time.time()
+                    last_state["state"] = event_state
                 else:
-                    if current_state and current_state["start"] != -1:
-                        hold_duration = time.time() - current_state["start"]
+                    if last_state and last_state["start"] != -1:
+                        hold_duration = time.time() - last_state["start"]
                         csv_writer.writerow([time.time(), converted, hold_duration, event_state])
-                        current_state["start"] = -1
-                        current_state["state"] = event_state
+                        last_state["start"] = -1
+                        last_state["state"] = event_state
 
 
 if __name__ == '__main__':
