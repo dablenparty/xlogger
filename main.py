@@ -6,14 +6,17 @@ import time
 from inputs import get_gamepad, rescan_devices, UnpluggedError
 
 from src.constants import BUTTON_MAP
-# represents if a button is pressed or not
-CONTROLLER_STATE = {key: {"start": -1, "state": 0} for key in BUTTON_MAP.values()}
 
-if __name__ == '__main__':
+
+def main():
+    # represents if a button is pressed or not
+    controller_state = {key: {"start": -1, "state": 0} for key in BUTTON_MAP.values()}
+
     file_safe_date_string = str(dt.datetime.now()).replace(":", "_")
     data_file = os.path.join(os.path.dirname(__file__), "data", f'{file_safe_date_string}.csv')
     os.makedirs(os.path.dirname(data_file), exist_ok=True)  # make sure the data directory exists
     write_header = not os.path.exists(data_file)
+
     last_dpad_code = None
     with open(data_file, "w", newline='') as csvfile:
         csv_writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -43,7 +46,7 @@ if __name__ == '__main__':
                 # for now, just ignore the stick events
                 if "STICK" in converted:
                     continue
-                current_state = CONTROLLER_STATE.get(converted)
+                current_state = controller_state.get(converted)
                 print(f"{converted} {event_state}")
                 if not current_state:
                     continue
@@ -57,3 +60,7 @@ if __name__ == '__main__':
                         csv_writer.writerow([time.time(), converted, hold_duration, event_state])
                         current_state["start"] = -1
                         current_state["state"] = event_state
+
+
+if __name__ == '__main__':
+    main()
