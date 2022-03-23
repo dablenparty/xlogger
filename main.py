@@ -69,9 +69,10 @@ def main():
                 press_time = press_times.get(button_name, -1)
 
                 now = time.time()
-                if event_state and press_time == -1:
+                if event_state:
                     # button was pressed
-                    press_times[button_name] = now
+                    if press_time == -1:
+                        press_times[button_name] = now
                 elif press_time != -1:
                     # button was released
                     print(f"{button_name} released after {round(now - press_time, 4)} seconds")
