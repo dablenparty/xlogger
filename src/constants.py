@@ -1,4 +1,4 @@
-BUTTON_MAP = {
+BUTTON_NAME_MAP = {
     'BTN_NORTH': 'Y',
     'BTN_SOUTH': 'A',
     'BTN_EAST': 'B',
@@ -20,4 +20,26 @@ BUTTON_MAP = {
     'ABS_RX': 'R_STICK_X',
     'ABS_RY': 'R_STICK_Y',
 }
+
+CONTROLLER_EVENTS = {
+    'BTN_NORTH',
+    'BTN_SOUTH',
+    'BTN_EAST',
+    'BTN_WEST',
+    'BTN_TL',
+    'BTN_TR',
+    'BTN_THUMBL',
+    'BTN_THUMBR',
+    'BTN_SELECT',
+    'BTN_START',
+    'ABS_RZ',
+    'ABS_Z',
+    'ABS_HAT0X',
+    'ABS_HAT0Y',
+    'ABS_X',
+    'ABS_Y',
+    'ABS_RX',
+    'ABS_RY',
+}
+
 JOYSTICK_CUTOFF = 2000

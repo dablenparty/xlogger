@@ -1,10 +1,11 @@
 import csv
 import os
+import re
 import time
 
 from inputs import get_gamepad, rescan_devices, UnpluggedError
 
-from src.constants import BUTTON_MAP
+from src.constants import BUTTON_NAME_MAP, CONTROLLER_EVENTS
 from src.utils import get_file_safe_date_string
 from src.visualize import visualize_data
 
@@ -23,8 +24,7 @@ def create_data_file():
 
 def main(output_file):
     # represents if a button is pressed or not
-    press_times = {key: -1 for key in BUTTON_MAP.values()}
-    last_dpad_code = None
+    press_times = {key: {"time": -1, "state": 0} for key in CONTROLLER_EVENTS}
 
     write_header = not os.path.exists(output_file)
 
@@ -45,40 +45,32 @@ def main(output_file):
             # events is a generator
             # think of this loop like an event emitter and each iteration is the callback for a single event
             for event in events:
+                s = time.perf_counter()
                 event_code = event.code
-                # skips the synchronize reports
                 if event_code == 'SYN_REPORT':
                     continue
-                event_state = event.state
-
-                # D-Pad is a special case
-                if 'HAT0' in event_code:
-                    if event_state:
-                        event_code += f"_{event_state}"
-                        last_dpad_code = event_code
-                    else:
-                        event_code = last_dpad_code
-                button_name = BUTTON_MAP.get(event_code, event.code)
-
-                # TODO: use a separate file for the stick events
-                # for now, just ignore the stick events
-                if "STICK" in button_name:
+                elif re.match(r"^ABS_R?[XY]$", event_code):
+                    # skip the stick events for now
                     continue
-
-                # get the last time the button was pressed
-                press_time = press_times.get(button_name, -1)
-
                 now = time.time()
-                if event_state:
-                    # button was pressed
-                    if press_time == -1:
-                        press_times[button_name] = now
-                elif press_time != -1:
-                    # button was released
-                    print(f"{button_name} released after {round(now - press_time, 4)} seconds")
-                    csv_writer.writerow([press_time, now, button_name])
-                    press_times[button_name] = -1
-
+                last_state = press_times.get(event_code, {"time": -1, "state": 0})
+                down_time = last_state.get("time", -1)
+                if event.state:
+                    if down_time == -1:
+                        last_state["time"] = now
+                        last_state["state"] = event.state
+                elif down_time != -1:
+                    release_time = now
+                    press_state = last_state.get("state", 1)
+                    last_state["time"] = -1
+                    last_state["state"] = event.state
+                    key = event_code
+                    if "HAT0" in key:
+                        key += f"_{press_state}"
+                    button_name = BUTTON_NAME_MAP.get(key, event_code)
+                    csv_writer.writerow([down_time, release_time, button_name])
+                    print(f"{button_name} held for {release_time - down_time} seconds")
+                print(f"event processed in {time.perf_counter() - s} seconds")
 
 if __name__ == '__main__':
     data_file = create_data_file()
