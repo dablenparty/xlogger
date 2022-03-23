@@ -2,7 +2,7 @@ import csv
 import os.path
 import time
 
-from inputs import get_gamepad, UnpluggedError
+from inputs import get_gamepad, rescan_devices, UnpluggedError    
 
 BUTTON_MAP = {
     'BTN_NORTH': 'Y',
@@ -33,8 +33,9 @@ JOYSTICK_CUTOFF = 2000
 CONTROLLER_STATE = {key: {"start": -1, "state": 0} for key in BUTTON_MAP.values()}
 
 if __name__ == '__main__':
-    data_file = "events.csv"
-    write_header = os.path.exists(data_file)
+    data_file = os.path.join(os.path.dirname(__file__), 'controller.csv')
+    write_header = not os.path.exists(data_file)
+    last_dpad_code = None
     with open(data_file, "a+") as csvfile:
         csv_writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         # Write header
@@ -44,16 +45,21 @@ if __name__ == '__main__':
             try:
                 events = get_gamepad()
             except UnpluggedError:
-                print("\rController unplugged", sep='', end='', flush=True)
+                # only check for new devices every half second
                 time.sleep(0.5)
+                rescan_devices()
                 continue
             for event in events:
-                if event.code == 'SYN_REPORT':
-                    continue
                 code = event.code
+                if code == 'SYN_REPORT':
+                    continue
                 event_state = event.state
-                if 'HAT0' in event.code:
-                    code += f"_{event_state}"
+                if 'HAT0' in code:
+                    if event_state:
+                        code += f"_{event_state}"
+                        last_dpad_code = code
+                    else:
+                        code = last_dpad_code
                 converted = BUTTON_MAP.get(code, event.code)
                 # for now, just ignore the stick events
                 if "STICK" in converted:
@@ -61,7 +67,7 @@ if __name__ == '__main__':
                 # if "STICK" in converted and -JOYSTICK_CUTOFF <= event.state <= JOYSTICK_CUTOFF:
                 #     continue
                 current_state = CONTROLLER_STATE.get(converted)
-                print(f"\n{converted} {event_state}")
+                print(f"{converted} {event_state}")
                 if not current_state:
                     continue
                 if event_state:
