@@ -1,5 +1,6 @@
 import csv
-import os.path
+import datetime as dt
+import os
 import time
 
 from inputs import get_gamepad, rescan_devices, UnpluggedError    
@@ -33,10 +34,12 @@ JOYSTICK_CUTOFF = 2000
 CONTROLLER_STATE = {key: {"start": -1, "state": 0} for key in BUTTON_MAP.values()}
 
 if __name__ == '__main__':
-    data_file = os.path.join(os.path.dirname(__file__), 'controller.csv')
+    file_safe_date_string = str(dt.datetime.now()).replace(":", "_")
+    data_file = os.path.join(os.path.dirname(__file__), "data", f'{file_safe_date_string}.csv')
+    os.makedirs(os.path.dirname(data_file), exist_ok=True)  # make sure the data directory exists
     write_header = not os.path.exists(data_file)
     last_dpad_code = None
-    with open(data_file, "a+") as csvfile:
+    with open(data_file, "w", newline='') as csvfile:
         csv_writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         # Write header
         if write_header:
