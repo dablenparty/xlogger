@@ -6,6 +6,7 @@ from inputs import get_gamepad, rescan_devices, UnpluggedError
 
 from src.constants import BUTTON_MAP
 from src.utils import get_file_safe_date_string
+from src.visualize import visualize_data
 
 
 def create_data_file():
@@ -20,15 +21,14 @@ def create_data_file():
     return data_file
 
 
-def main():
+def main(output_file):
     # represents if a button is pressed or not
     press_times = {key: -1 for key in BUTTON_MAP.values()}
     last_dpad_code = None
 
-    data_file = create_data_file()
-    write_header = not os.path.exists(data_file)
+    write_header = not os.path.exists(output_file)
 
-    with open(data_file, "w", newline='') as csvfile:
+    with open(output_file, "w", newline='') as csvfile:
         csv_writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         # Write header
         if write_header:
@@ -81,4 +81,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    data_file = create_data_file()
+    try:
+        main(data_file)
+    except KeyboardInterrupt:
+        visualize_data(data_file)
