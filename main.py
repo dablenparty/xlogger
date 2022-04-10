@@ -24,7 +24,7 @@ def create_data_file():
 
 def main(output_file):
     # represents if a button is pressed or not
-    press_times = {key: {"time": -1, "state": 0} for key in CONTROLLER_EVENTS}
+    press_times = {key: {"time": -1, "state": 0.0} for key in CONTROLLER_EVENTS}
 
     write_header = not os.path.exists(output_file)
 
@@ -53,7 +53,7 @@ def main(output_file):
                     # skip the stick events for now
                     continue
                 now = time.time()
-                last_state = press_times.get(event_code, {"time": -1, "state": 0})
+                last_state = press_times.get(event_code, {"time": -1, "state": 0.0})
                 down_time = last_state.get("time", -1)
                 if event.state != 0:
                     # event state is 0 when the button is not pressed
@@ -75,6 +75,7 @@ def main(output_file):
                     csv_writer.writerow([down_time, release_time, button_name])
                     print(f"{button_name} held for {release_time - down_time} seconds")
                 print(f"event processed in {time.perf_counter() - s} seconds")
+
 
 if __name__ == '__main__':
     data_file = create_data_file()
