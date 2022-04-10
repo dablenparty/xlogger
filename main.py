@@ -17,9 +17,9 @@ def create_data_file():
     :return: Path to the data file
     """
     file_safe_date_string = get_file_safe_date_string()
-    data_file = os.path.join(os.path.dirname(__file__), "data", f'{file_safe_date_string}.csv')
-    os.makedirs(os.path.dirname(data_file), exist_ok=True)  # make sure the data directory exists
-    return data_file
+    file = os.path.join(os.path.dirname(__file__), "data", f'{file_safe_date_string}.csv')
+    os.makedirs(os.path.dirname(file), exist_ok=True)  # make sure the data directory exists
+    return file
 
 
 def main(output_file):
