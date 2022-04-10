@@ -45,7 +45,6 @@ def main(output_file):
             # events is a generator
             # think of this loop like an event emitter and each iteration is the callback for a single event
             for event in events:
-                s = time.perf_counter()
                 event_code = event.code
                 if event_code == 'SYN_REPORT':
                     continue
@@ -74,7 +73,6 @@ def main(output_file):
                     button_name = BUTTON_NAME_MAP.get(key, event_code)
                     csv_writer.writerow([down_time, release_time, button_name])
                     print(f"{button_name} held for {release_time - down_time} seconds")
-                print(f"event processed in {time.perf_counter() - s} seconds")
 
 
 if __name__ == '__main__':
