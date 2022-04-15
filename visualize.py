@@ -1,19 +1,23 @@
 import pandas as pd
 import plotly.express as px
+import sys
 
 
 def visualize_data(csv_file):
     df = pd.read_csv(csv_file)
     # print(df.head())
-    df['Hold Duration'] = round(df['Release Time'] - df['Press Time'], 3)
-    df['Press Time'] = pd.to_datetime(df['Press Time'], unit='s')
-    df['Release Time'] = pd.to_datetime(df['Release Time'], unit='s')
+    df['HoldDuration'] = round(df['ReleaseTime'] - df['PressTime'], 3)
+    df['PressTime'] = pd.to_datetime(df['PressTime'], unit='s')
+    df['ReleaseTime'] = pd.to_datetime(df['ReleaseTime'], unit='s')
     print(df.head())
-    fig = px.timeline(df, x_start='Press Time', x_end='Release Time', y='Button', color='Button',
+    fig = px.timeline(df, x_start='PressTime', x_end='ReleaseTime', y='Button', color='Button',
                       title='Button Timeline',
-                      hover_name='Button', custom_data=['Button', 'Hold Duration'])
+                      hover_name='Button', custom_data=['Button', 'HoldDuration'])
     fig.update_traces(hovertemplate="<br>".join([
         "%{customdata[0]}",
         "Duration: %{customdata[1]}s",
     ]))
     fig.show()
+
+if __name__ == '__main__':
+    visualize_data(sys.argv[1])
