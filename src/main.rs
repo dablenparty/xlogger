@@ -1,12 +1,23 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::fs::File;
 use std::time::SystemTime;
 use gilrs::{Button, Event, EventType, Gilrs};
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
+struct ControllerEvent {
+    press_time: f64,
+    release_time: f64,
+    button: String,
+}
 
 fn main() {
     let mut gilrs = Gilrs::new().unwrap();
 
     let mut time_map: HashMap<String, SystemTime> = HashMap::new();
+    let mut csv_writer = csv::Writer::from_writer(File::create("TEST.csv").unwrap());
 
     loop {
         while let Some(Event { event, time: event_time, .. }) = gilrs.next_event() {
@@ -15,8 +26,14 @@ fn main() {
                 if value == 0.0 {
                     let down_time = time_map.remove(&name).unwrap();
                     let duration = event_time.duration_since(down_time).unwrap();
+                    time_map.insert(name.clone(), SystemTime::UNIX_EPOCH);
                     println!("{} released after {:?}", name, duration);
-                    time_map.insert(name, SystemTime::UNIX_EPOCH);
+                    csv_writer.serialize(ControllerEvent {
+                        press_time: down_time.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64(),
+                        release_time: event_time.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64(),
+                        button: name,
+                    }).unwrap();
+                    csv_writer.flush().unwrap();
                 } else {
                     let map_time_opt = time_map.get(&name);
                     if map_time_opt.unwrap_or(&SystemTime::UNIX_EPOCH) == &SystemTime::UNIX_EPOCH {
