@@ -5,8 +5,8 @@ fn main() {
 
     loop {
         while let Some(Event { event, time: event_time, .. }) = gilrs.next_event() {
-            if let EventType::ButtonChanged(_, _, _) = event {
-                println!("{:?} {:?}", event, event_time);
+            if let EventType::ButtonChanged(button, ..) = event {
+                println!("{:?} {:?}", button, event_time);
             }
         }
     }
