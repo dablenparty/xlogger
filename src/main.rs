@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::File;
-use std::sync::mpsc::channel;
+use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use gilrs::{Event, EventType, Gilrs};
 use serde::Serialize;
@@ -18,20 +18,20 @@ fn main() {
     let mut gilrs = Gilrs::new().unwrap();
 
     let mut time_map: HashMap<String, SystemTime> = HashMap::new();
-    let mut csv_writer = csv::Writer::from_writer(File::create("TEST.csv").unwrap());
+    let csv_lock = Arc::new(Mutex::new(csv::Writer::from_writer(File::create("TEST.csv").unwrap())));
 
-    let (ctrlc_tx, ctrlc_rx) = channel();
+    let writer_clone = csv_lock.clone();
     ctrlc::set_handler(move || {
-        ctrlc_tx.send(()).expect("Could not send signal on channel");
+        println!("received ctrl-c");
+        writer_clone.lock().unwrap_or_else(|_| {
+            eprintln!("failed to lock csv_writer");
+            std::process::exit(1);
+        }).flush().unwrap();
+        std::process::exit(0);
     }).expect("Error setting the Ctrl-C handler");
 
 
     loop {
-        ctrlc_rx.recv_timeout(std::time::Duration::from_millis(1)).and_then(|_| {
-            println!("received ctrl-c");
-            csv_writer.flush().unwrap();
-            std::process::exit(0);
-        }).unwrap_or(());
         while let Some(Event { event, time: event_time, .. }) = gilrs.next_event() {
             if let EventType::ButtonChanged(button, value, ..) = event {
                 let name = format!("{:?}", button);
@@ -40,6 +40,10 @@ fn main() {
                     let duration = event_time.duration_since(down_time).unwrap();
                     time_map.insert(name.clone(), SystemTime::UNIX_EPOCH);
                     println!("{} released after {:?}", name, duration);
+                    let mut csv_writer = csv_lock.lock().unwrap_or_else(|_| {
+                        eprintln!("failed to lock csv_writer");
+                        std::process::exit(1);
+                    });
                     csv_writer.serialize(ControllerEvent {
                         press_time: down_time.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64(),
                         release_time: event_time.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64(),
