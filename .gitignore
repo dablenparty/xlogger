@@ -17,6 +17,7 @@ eggs/
 lib/
 lib64/
 parts/
+pyout/
 sdist/
 var/
 wheels/
@@ -133,8 +134,3 @@ dmypy.json
 .vscode/
 
 *.csv
-
-
-# Added by cargo
-
-/target
