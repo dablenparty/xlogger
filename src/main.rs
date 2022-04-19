@@ -1,8 +1,10 @@
+use chrono;
 use gilrs::{Event, EventType, Gilrs};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fs::File;
+use std::fs::{self, File};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
@@ -14,12 +16,35 @@ struct ControllerEvent {
     button: String,
 }
 
+fn get_data_folder() -> PathBuf {
+    std::env::current_exe()
+        .unwrap_or(PathBuf::from("."))
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join("data")
+}
+
 fn main() {
-    let mut gilrs = Gilrs::new().unwrap();
+    let filename = chrono::Local::now()
+        .naive_local()
+        .format("%Y-%m-%d_%H-%M-%S.csv")
+        .to_string();
+
+    // get the data folder and create it, ignoring the error if it already exists
+    let mut csv_path = get_data_folder();
+    fs::create_dir(&csv_path).unwrap_or_else(|e| {
+        if e.kind() == std::io::ErrorKind::AlreadyExists {
+            return;
+        }
+        eprintln!("{:?}", e);
+        std::process::exit(1);
+    });
+    // append the filename to the data folder to get the full path
+    csv_path.push(filename);
 
     let mut time_map: HashMap<String, SystemTime> = HashMap::new();
     let csv_lock = Arc::new(Mutex::new(csv::Writer::from_writer(
-        File::create("TEST.csv").unwrap(),
+        File::create(&csv_path).unwrap(),
     )));
 
     let writer_clone = csv_lock.clone();
@@ -36,6 +61,11 @@ fn main() {
         std::process::exit(0);
     })
     .expect("Error setting the Ctrl-C handler");
+
+    let mut gilrs = Gilrs::new().unwrap();
+
+    println!("data file: {:?}", csv_path);
+    println!("At any time, click into this window and press Ctrl-C to exit this program smoothly");
 
     loop {
         while let Some(Event {
