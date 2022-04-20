@@ -46,50 +46,51 @@ fn main() {
         File::create(&csv_path).unwrap(),
     )));
 
-    // clone the writer into the closure
-    let writer_clone = csv_lock.clone();
-    let csv_path_clone = csv_path.clone();
-    ctrlc::set_handler(move || {
-        println!("received ctrl-c");
-        // this ensures that the writer has been properly flushed before the program exits
-        writer_clone
-            .lock()
-            .unwrap_or_else(|_| {
-                eprintln!("failed to lock csv_writer");
-                std::process::exit(1);
-            })
-            .flush()
-            .unwrap();
-        // pass the data file to the visualize script
-        let data_file = &csv_path_clone;
-        let visualize_script = std::env::current_exe()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .join("visualize")
-            .join("visualize");
-        // spawn the visualize script and wait for it to finish
-        let mut proc_handle = std::process::Command::new(visualize_script)
-            .arg(data_file)
-            .spawn()
-            .unwrap_or_else(|_| {
-                eprintln!("failed to spawn visualize script");
+    let _ = {
+        // clone the writer and path into the closure
+        let csv_lock = csv_lock.clone();
+        let csv_path = csv_path.clone();
+        ctrlc::set_handler(move || {
+            println!("received ctrl-c");
+            // this ensures that the writer has been properly flushed before the program exits
+            csv_lock
+                .lock()
+                .unwrap_or_else(|_| {
+                    eprintln!("failed to lock csv_writer");
+                    std::process::exit(1);
+                })
+                .flush()
+                .unwrap();
+            // pass the data file to the visualize script
+            let visualize_script = std::env::current_exe()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join("visualize")
+                .join("visualize");
+            // spawn the visualize script and wait for it to finish
+            let mut proc_handle = std::process::Command::new(visualize_script)
+                .arg(&csv_path)
+                .spawn()
+                .unwrap_or_else(|_| {
+                    eprintln!("failed to spawn visualize script");
+                    std::process::exit(1);
+                });
+            // wait for the process to finish
+            let exit_status = proc_handle.wait().unwrap_or_else(|_| {
+                eprintln!("failed to wait for visualize script");
                 std::process::exit(1);
             });
-        // wait for the process to finish
-        let exit_status = proc_handle.wait().unwrap_or_else(|_| {
-            eprintln!("failed to wait for visualize script");
-            std::process::exit(1);
-        });
 
-        if !exit_status.success() {
-            eprintln!("visualize script exited with non-zero status");
-            std::process::exit(1);
-        }
+            if !exit_status.success() {
+                eprintln!("visualize script exited with non-zero status");
+                std::process::exit(1);
+            }
 
-        std::process::exit(0);
-    })
-    .expect("Error setting the Ctrl-C handler");
+            std::process::exit(0);
+        })
+        .expect("Error setting the Ctrl-C handler");
+    };
 
     let mut gilrs = Gilrs::new().unwrap();
 
