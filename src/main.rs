@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::SystemTime;
 
 #[derive(Debug, Serialize)]
@@ -13,14 +13,6 @@ struct ControllerEvent {
     press_time: f64,
     release_time: f64,
     button: String,
-}
-
-fn get_data_folder() -> PathBuf {
-    std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("./xlogger.exe"))
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .join("data")
 }
 
 fn main() {
@@ -51,42 +43,11 @@ fn main() {
         let csv_path = csv_path.clone();
         ctrlc::set_handler(move || {
             println!("received ctrl-c");
-            // this ensures that the writer has been properly flushed before the program exits
-            csv_lock
-                .lock()
-                .unwrap_or_else(|_| {
-                    eprintln!("failed to lock csv_writer");
-                    std::process::exit(1);
-                })
-                .flush()
-                .unwrap();
-            // pass the data file to the visualize script
-            let visualize_script = std::env::current_exe()
-                .unwrap_or_else(|_| PathBuf::from("."))
-                .parent()
-                .unwrap_or_else(|| Path::new("."))
-                .join("visualize")
-                .join("visualize");
-            // spawn the visualize script and wait for it to finish
-            let mut proc_handle = std::process::Command::new(visualize_script)
-                .arg(&csv_path)
-                .spawn()
-                .unwrap_or_else(|_| {
-                    eprintln!("failed to spawn visualize script");
-                    std::process::exit(1);
-                });
-            // wait for the process to finish
-            let exit_status = proc_handle.wait().unwrap_or_else(|_| {
-                eprintln!("visualize script never started");
+            let csv_writer = csv_lock.lock().unwrap_or_else(|_| {
+                eprintln!("failed to lock csv_writer");
                 std::process::exit(1);
             });
-
-            if !exit_status.success() {
-                eprintln!("visualize script didn't finish successfully");
-                std::process::exit(1);
-            }
-
-            std::process::exit(0);
+            exit_handler(csv_writer, &csv_path);
         })
         .expect("Error setting the Ctrl-C handler");
     };
@@ -152,4 +113,57 @@ fn main() {
             }
         }
     }
+}
+
+/// Get the data folder. It resides alongside the executable.
+///
+/// For example, if the executable is at `/path/to/executable`, the data folder is `/path/to/data`.
+fn get_data_folder() -> PathBuf {
+    std::env::current_exe()
+        .unwrap_or_else(|_| PathBuf::from("./xlogger.exe"))
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("data")
+}
+
+/// The exit handler for the program. This is designed to be passed to the `ctrlc::set_handler`
+/// function.
+///
+/// # Arguments
+///
+/// * `csv_writer_guard`: A mutex guard on the csv writer. This is used to flush the csv writer
+///                       when the program is exiting.
+/// * `csv_path`: The path to the csv file.
+///
+/// returns: ()
+fn exit_handler(mut csv_writer_guard: MutexGuard<csv::Writer<File>>, csv_path: &PathBuf) {
+    // this ensures that the writer has been properly flushed before the program exits
+    csv_writer_guard.flush().unwrap();
+    // pass the data file to the visualize script
+    let visualize_script = std::env::current_exe()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("visualize")
+        .join("visualize");
+    // spawn the visualize script and wait for it to finish
+    let mut proc_handle = std::process::Command::new(visualize_script)
+        .arg(&csv_path)
+        .spawn()
+        .unwrap_or_else(|_| {
+            eprintln!("failed to spawn visualize script");
+            std::process::exit(1);
+        });
+    // wait for the process to finish
+    let exit_status = proc_handle.wait().unwrap_or_else(|_| {
+        eprintln!("visualize script never started");
+        std::process::exit(1);
+    });
+
+    if !exit_status.success() {
+        eprintln!("visualize script didn't finish successfully");
+        std::process::exit(1);
+    }
+
+    std::process::exit(0);
 }
