@@ -41,7 +41,6 @@ fn main() {
     // append the filename to the data folder to get the full path
     csv_path.push(filename);
 
-    let mut time_map: HashMap<String, SystemTime> = HashMap::new();
     let csv_lock = Arc::new(Mutex::new(csv::Writer::from_writer(
         File::create(&csv_path).unwrap(),
     )));
@@ -78,12 +77,12 @@ fn main() {
                 });
             // wait for the process to finish
             let exit_status = proc_handle.wait().unwrap_or_else(|_| {
-                eprintln!("failed to wait for visualize script");
+                eprintln!("visualize script never started");
                 std::process::exit(1);
             });
 
             if !exit_status.success() {
-                eprintln!("visualize script exited with non-zero status");
+                eprintln!("visualize script didn't finish successfully");
                 std::process::exit(1);
             }
 
@@ -92,7 +91,10 @@ fn main() {
         .expect("Error setting the Ctrl-C handler");
     };
 
+    // create the controller listener
     let mut gilrs = Gilrs::new().unwrap();
+    // this map will be used to store the last time a button was pressed
+    let mut time_map: HashMap<String, SystemTime> = HashMap::new();
 
     println!("data file: {:?}", csv_path);
     println!("At any time, click into this window and press Ctrl-C to exit this program smoothly");
@@ -106,9 +108,14 @@ fn main() {
         {
             if let EventType::ButtonChanged(button, value, ..) = event {
                 let name = format!("{:?}", button);
+                // value == 0 means the button was released
                 if value == 0.0 {
+                    // tracking how long a button is "held down" is done by subtracting the time the
+                    // button was pressed from this (the time the button was released)
                     let down_time = time_map.remove(&name).unwrap();
                     let duration = event_time.duration_since(down_time).unwrap();
+                    // resets this key in the time map to the unix epoch as a placeholder for the
+                    // next button press
                     time_map.insert(name.clone(), SystemTime::UNIX_EPOCH);
                     println!("{} released after {:?}", name, duration);
                     // this should be ok since the lock will always be acquired by this thread
@@ -134,6 +141,8 @@ fn main() {
                         .unwrap();
                     csv_writer.flush().unwrap();
                 } else {
+                    // value != 0 means the button was pressed (or is still pressed)
+                    // if this is the first time the button was pressed, record the time
                     let map_time_opt = time_map.get(&name);
                     if map_time_opt.unwrap_or(&SystemTime::UNIX_EPOCH) == &SystemTime::UNIX_EPOCH {
                         time_map.insert(name.clone(), event_time);
