@@ -1,4 +1,3 @@
-use chrono;
 use gilrs::{Event, EventType, Gilrs};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -18,9 +17,9 @@ struct ControllerEvent {
 
 fn get_data_folder() -> PathBuf {
     std::env::current_exe()
-        .unwrap_or(PathBuf::from("."))
+        .unwrap_or_else(|_| PathBuf::from("."))
         .parent()
-        .unwrap_or(Path::new("."))
+        .unwrap_or_else(|| Path::new("."))
         .join("data")
 }
 
