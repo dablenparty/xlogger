@@ -17,7 +17,7 @@ struct ControllerEvent {
 
 fn get_data_folder() -> PathBuf {
     std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("."))
+        .unwrap_or_else(|_| PathBuf::from("./xlogger.exe"))
         .parent()
         .unwrap_or_else(|| Path::new("."))
         .join("data")
