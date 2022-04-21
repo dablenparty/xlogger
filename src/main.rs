@@ -1,13 +1,14 @@
-use gilrs::{Axis, Event, EventType, Gilrs};
-use log::{debug, info, warn};
-use serde::Serialize;
-use simplelog::*;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::SystemTime;
+
+use gilrs::{Axis, Event, EventType, Gilrs};
+use log::{debug, info, warn};
+use serde::Serialize;
+use simplelog::*;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
