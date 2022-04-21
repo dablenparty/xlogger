@@ -59,14 +59,19 @@ fn main() {
     let _ = {
         // clone the writer and path into the closure
         let button_csv_lock = button_csv_lock.clone();
+        let stick_csv_lock = stick_csv_lock.clone();
         let button_file_path = button_file_path.clone();
         ctrlc::set_handler(move || {
             info!("received ctrl-c");
-            let csv_writer = button_csv_lock.lock().unwrap_or_else(|_| {
-                error!("failed to lock csv_writer");
+            let button_csv_writer = button_csv_lock.lock().unwrap_or_else(|_| {
+                error!("failed to lock button_csv_writer");
                 std::process::exit(1);
             });
-            exit_handler(csv_writer, &button_file_path);
+            let stick_csv_writer = stick_csv_lock.lock().unwrap_or_else(|_| {
+                error!("failed to lock stick_csv_writer");
+                std::process::exit(1);
+            });
+            exit_handler(button_csv_writer, stick_csv_writer, &button_file_path);
         })
         .expect("Error setting the Ctrl-C handler");
     };
@@ -252,18 +257,28 @@ fn get_data_folder() -> PathBuf {
 /// The exit handler for the program. This is designed to be passed to the `ctrlc::set_handler`
 /// function.
 ///
+/// The writer guards passed in here are dropped when the function returns and are used to ensure
+/// that the writers are flushed before the program exits.
+///
 /// # Arguments
 ///
-/// * `csv_writer_guard`: A mutex guard on the csv writer. This is used to flush the csv writer
-///                       when the program is exiting.
+/// * `button_writer_guard`: A mutex guard on the csv writer for the buttons file.
+///
+/// * `stick_writer_guard`: A mutex guard on the csv writer for the sticks file.
+///
 /// * `csv_path`: The path to the csv file.
 ///
 /// returns: ()
-fn exit_handler(mut csv_writer_guard: MutexGuard<csv::Writer<File>>, csv_path: &PathBuf) {
-    // this ensures that the writer has been properly flushed before the program exits
-    debug!("flushing csv writer");
-    csv_writer_guard.flush().unwrap();
-    // pass the data file to the visualize script
+fn exit_handler(
+    mut button_writer_guard: MutexGuard<csv::Writer<File>>,
+    mut stick_writer_guard: MutexGuard<csv::Writer<File>>,
+    csv_path: &PathBuf,
+) {
+    // this ensures that the writers have been properly flushed before the program exits
+    debug!("flushing csv writers");
+    button_writer_guard.flush().unwrap();
+    stick_writer_guard.flush().unwrap();
+    // pass the button data file to the visualize script
     let visualize_script = std::env::current_exe()
         .unwrap_or_else(|_| PathBuf::from("./xlogger.exe"))
         .parent()
