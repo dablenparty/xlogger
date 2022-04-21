@@ -129,7 +129,7 @@ fn main() {
                         .expect("failed to serialize csv");
                 }
                 EventType::ButtonChanged(button, value, ..) => {
-                    info!("matched event: {:?}", event);
+                    debug!("matched event: {:?}", event);
                     let name = format!("{:?}", button);
                     // value == 0 means the button was released
                     if value == 0.0 {
@@ -144,7 +144,7 @@ fn main() {
                         // resets this key in the time map to the unix epoch as a placeholder for the
                         // next button press
                         time_map.insert(name.clone(), SystemTime::UNIX_EPOCH);
-                        info!("button {} was pressed for {:?}", name, duration);
+                        info!("button {} was released after {:?}", name, duration);
                         // this should be ok since the lock will always be acquired by this thread
                         // the only time it could be acquired by another thread is if the program
                         // is exiting, in which case the lock will be dropped and the writer will
@@ -204,7 +204,7 @@ fn init_logger() {
     file_path.push(filename);
     CombinedLogger::init(vec![
         TermLogger::new(
-            LevelFilter::Warn,
+            LevelFilter::Info,
             Config::default(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
