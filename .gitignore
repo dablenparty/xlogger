@@ -17,6 +17,7 @@ eggs/
 lib/
 lib64/
 parts/
+pyout/
 sdist/
 var/
 wheels/
