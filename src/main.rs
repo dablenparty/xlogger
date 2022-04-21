@@ -68,54 +68,59 @@ fn main() {
             ..
         }) = gilrs.next_event()
         {
-            if let EventType::ButtonChanged(button, value, ..) = event {
-                info!("matched event: {:?}", event);
-                let name = format!("{:?}", button);
-                // value == 0 means the button was released
-                if value == 0.0 {
-                    // tracking how long a button is "held down" is done by subtracting the time the
-                    // button was pressed from this (the time the button was released)
-                    let down_time = time_map
-                        .remove(&name)
-                        .expect("a button was released without being pressed!");
-                    let duration = event_time
-                        .duration_since(down_time)
-                        .expect("time went backwards");
-                    // resets this key in the time map to the unix epoch as a placeholder for the
-                    // next button press
-                    time_map.insert(name.clone(), SystemTime::UNIX_EPOCH);
-                    info!("button {} was pressed for {:?}", name, duration);
-                    // this should be ok since the lock will always be acquired by this thread
-                    // the only time it could be acquired by another thread is if the program
-                    // is exiting, in which case the lock will be dropped and the writer will
-                    // be flushed
-                    let mut csv_writer = csv_lock.lock().unwrap_or_else(|_| {
-                        error!("failed to lock csv_writer");
-                        std::process::exit(1);
-                    });
-                    let record = ControllerEvent {
-                        press_time: down_time
-                            .duration_since(SystemTime::UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs_f64(),
-                        release_time: event_time
-                            .duration_since(SystemTime::UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs_f64(),
-                        button: name,
-                    };
-                    debug!("writing following to csv: {:?}", record);
-                    csv_writer.serialize(record).unwrap();
-                    csv_writer.flush().unwrap();
-                } else {
-                    // value != 0 means the button was pressed (or is still pressed)
-                    // if this is the first time the button was pressed, record the time
-                    let map_time_opt = time_map.get(&name);
-                    if map_time_opt.unwrap_or(&SystemTime::UNIX_EPOCH) == &SystemTime::UNIX_EPOCH {
-                        time_map.insert(name.clone(), event_time);
-                        debug!("{} pressed", name);
+            match event {
+                EventType::ButtonChanged(button, value, ..) => {
+                    info!("matched event: {:?}", event);
+                    let name = format!("{:?}", button);
+                    // value == 0 means the button was released
+                    if value == 0.0 {
+                        // tracking how long a button is "held down" is done by subtracting the time the
+                        // button was pressed from this (the time the button was released)
+                        let down_time = time_map
+                            .remove(&name)
+                            .expect("a button was released without being pressed!");
+                        let duration = event_time
+                            .duration_since(down_time)
+                            .expect("time went backwards");
+                        // resets this key in the time map to the unix epoch as a placeholder for the
+                        // next button press
+                        time_map.insert(name.clone(), SystemTime::UNIX_EPOCH);
+                        info!("button {} was pressed for {:?}", name, duration);
+                        // this should be ok since the lock will always be acquired by this thread
+                        // the only time it could be acquired by another thread is if the program
+                        // is exiting, in which case the lock will be dropped and the writer will
+                        // be flushed
+                        let mut csv_writer = csv_lock.lock().unwrap_or_else(|_| {
+                            error!("failed to lock csv_writer");
+                            std::process::exit(1);
+                        });
+                        let record = ControllerEvent {
+                            press_time: down_time
+                                .duration_since(SystemTime::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs_f64(),
+                            release_time: event_time
+                                .duration_since(SystemTime::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs_f64(),
+                            button: name,
+                        };
+                        debug!("writing following to csv: {:?}", record);
+                        csv_writer.serialize(record).unwrap();
+                        csv_writer.flush().unwrap();
+                    } else {
+                        // value != 0 means the button was pressed (or is still pressed)
+                        // if this is the first time the button was pressed, record the time
+                        let map_time_opt = time_map.get(&name);
+                        if map_time_opt.unwrap_or(&SystemTime::UNIX_EPOCH)
+                            == &SystemTime::UNIX_EPOCH
+                        {
+                            time_map.insert(name.clone(), event_time);
+                            debug!("{} pressed", name);
+                        }
                     }
                 }
+                _ => {}
             }
         }
     }
