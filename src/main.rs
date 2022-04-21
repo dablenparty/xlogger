@@ -1,4 +1,4 @@
-use gilrs::{Event, EventType, Gilrs};
+use gilrs::{Axis, Event, EventType, Gilrs};
 use log::{debug, info, warn};
 use serde::Serialize;
 use simplelog::*;
@@ -11,10 +11,25 @@ use std::time::SystemTime;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
-struct ControllerEvent {
+struct ControllerButtonEvent {
     press_time: f64,
     release_time: f64,
     button: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
+struct ControllerStickEvent {
+    time: f64,
+    left_x: f32,
+    left_y: f32,
+    right_x: f32,
+    right_y: f32,
+}
+
+struct ControllerStickState {
+    x: f32,
+    y: f32,
 }
 
 fn main() {
@@ -27,27 +42,31 @@ fn main() {
         .to_string();
 
     // get the data folder and create it, ignoring the error if it already exists
-    let mut csv_path = get_data_folder();
-    create_dir_if_not_exists(&mut csv_path);
+    let csv_path = get_data_folder();
+    create_dir_if_not_exists(&csv_path);
     // append the filename to the data folder to get the full path
-    csv_path.push(filename);
+    let button_file_path = csv_path.join("buttons_".to_owned() + &filename);
+    let stick_file_path = csv_path.join("sticks_".to_owned() + &filename);
 
-    let csv_lock = Arc::new(Mutex::new(csv::Writer::from_writer(
-        File::create(&csv_path).unwrap(),
+    let button_csv_lock = Arc::new(Mutex::new(csv::Writer::from_writer(
+        File::create(&button_file_path).unwrap(),
+    )));
+    let stick_csv_lock = Arc::new(Mutex::new(csv::Writer::from_writer(
+        File::create(&stick_file_path).unwrap(),
     )));
 
     debug!("setting exit handler");
     let _ = {
         // clone the writer and path into the closure
-        let csv_lock = csv_lock.clone();
-        let csv_path = csv_path.clone();
+        let button_csv_lock = button_csv_lock.clone();
+        let button_file_path = button_file_path.clone();
         ctrlc::set_handler(move || {
             info!("received ctrl-c");
-            let csv_writer = csv_lock.lock().unwrap_or_else(|_| {
+            let csv_writer = button_csv_lock.lock().unwrap_or_else(|_| {
                 error!("failed to lock csv_writer");
                 std::process::exit(1);
             });
-            exit_handler(csv_writer, &csv_path);
+            exit_handler(csv_writer, &button_file_path);
         })
         .expect("Error setting the Ctrl-C handler");
     };
@@ -57,6 +76,9 @@ fn main() {
     let mut gilrs = Gilrs::new().expect("failed to create gilrs");
     // this map will be used to store the last time a button was pressed
     let mut time_map: HashMap<String, SystemTime> = HashMap::new();
+    // create the stick state structs
+    let mut left_stick_state = ControllerStickState { x: 0.0, y: 0.0 };
+    let mut right_stick_state = ControllerStickState { x: 0.0, y: 0.0 };
 
     println!("data file: {:?}", csv_path);
     println!("At any time, click into this window and press Ctrl-C to exit this program smoothly");
@@ -69,6 +91,37 @@ fn main() {
         }) = gilrs.next_event()
         {
             match event {
+                EventType::AxisChanged(axis, value, ..) => {
+                    // since there are SO MANY stick events, we log it at debug level only
+                    debug!("axis changed: {:?} {:?}", axis, value);
+                    match axis {
+                        Axis::LeftStickX => left_stick_state.x = value,
+                        Axis::LeftStickY => left_stick_state.y = value,
+                        Axis::RightStickX => right_stick_state.x = value,
+                        Axis::RightStickY => right_stick_state.y = value,
+                        _ => {
+                            warn!("unknown axis: {:?}", axis);
+                        }
+                    }
+                    // log the event to the csv file
+                    let mut csv_writer = stick_csv_lock.lock().unwrap_or_else(|_| {
+                        error!("failed to lock csv_writer");
+                        std::process::exit(1);
+                    });
+                    debug!("writing stick event to csv");
+                    csv_writer
+                        .serialize(ControllerStickEvent {
+                            time: event_time
+                                .duration_since(SystemTime::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs_f64(),
+                            left_x: left_stick_state.x,
+                            left_y: left_stick_state.y,
+                            right_x: right_stick_state.x,
+                            right_y: right_stick_state.y,
+                        })
+                        .expect("failed to serialize csv");
+                }
                 EventType::ButtonChanged(button, value, ..) => {
                     info!("matched event: {:?}", event);
                     let name = format!("{:?}", button);
@@ -90,11 +143,11 @@ fn main() {
                         // the only time it could be acquired by another thread is if the program
                         // is exiting, in which case the lock will be dropped and the writer will
                         // be flushed
-                        let mut csv_writer = csv_lock.lock().unwrap_or_else(|_| {
+                        let mut csv_writer = button_csv_lock.lock().unwrap_or_else(|_| {
                             error!("failed to lock csv_writer");
                             std::process::exit(1);
                         });
-                        let record = ControllerEvent {
+                        let record = ControllerButtonEvent {
                             press_time: down_time
                                 .duration_since(SystemTime::UNIX_EPOCH)
                                 .unwrap()
@@ -167,7 +220,7 @@ fn init_logger() {
 /// * `file_path`: the path to the directory
 ///
 /// returns: ()
-fn create_dir_if_not_exists(file_path: &mut PathBuf) {
+fn create_dir_if_not_exists(file_path: &PathBuf) {
     fs::create_dir(&file_path).unwrap_or_else(|e| {
         if e.kind() == std::io::ErrorKind::AlreadyExists {
             return;
