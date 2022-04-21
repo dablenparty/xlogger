@@ -155,11 +155,20 @@ fn init_logger() {
     .unwrap();
 }
 
+/// Creates a directory if it does not exist, failing if some other error occurs
+///
+/// # Arguments
+///
+/// * `file_path`: the path to the directory
+///
+/// returns: ()
 fn create_dir_if_not_exists(file_path: &mut PathBuf) {
     fs::create_dir(&file_path).unwrap_or_else(|e| {
         if e.kind() == std::io::ErrorKind::AlreadyExists {
             return;
         }
+        // initialization of the logging library uses this function, so we can't use the error!
+        // macro here
         eprintln!("{:?}", e);
         std::process::exit(1);
     });
