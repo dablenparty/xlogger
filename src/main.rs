@@ -73,8 +73,12 @@ fn main() {
                 if value == 0.0 {
                     // tracking how long a button is "held down" is done by subtracting the time the
                     // button was pressed from this (the time the button was released)
-                    let down_time = time_map.remove(&name).unwrap();
-                    let duration = event_time.duration_since(down_time).unwrap();
+                    let down_time = time_map
+                        .remove(&name)
+                        .expect("a button was released without being pressed!");
+                    let duration = event_time
+                        .duration_since(down_time)
+                        .expect("time went backwards");
                     // resets this key in the time map to the unix epoch as a placeholder for the
                     // next button press
                     time_map.insert(name.clone(), SystemTime::UNIX_EPOCH);
