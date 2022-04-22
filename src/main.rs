@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::thread;
 
 use eframe::{egui, epi};
-use gilrs::Gilrs;
 use log::{info, LevelFilter};
 use simplelog::{Config, WriteLogger};
 
@@ -51,18 +50,7 @@ fn main() {
 
     let _ = {
         let should_run = should_run.clone();
-        thread::spawn(move || {
-            let mut gilrs = Gilrs::new().unwrap();
-
-            loop {
-                while let Some(gilrs::Event { event, id, .. }) = gilrs.next_event() {
-                    if !should_run.load(std::sync::atomic::Ordering::Relaxed) {
-                        continue;
-                    }
-                    println!("{:?} {:?}", id, event);
-                }
-            }
-        });
+        thread::spawn(move || xlogger::run_event_loop(should_run));
     };
 
     let app = XloggerApp::new(should_run);
