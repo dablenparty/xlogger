@@ -15,12 +15,6 @@ struct XloggerApp {
     should_run: Arc<AtomicBool>,
 }
 
-impl XloggerApp {
-    fn new(should_run: Arc<AtomicBool>) -> Self {
-        Self { should_run }
-    }
-}
-
 impl epi::App for XloggerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &epi::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -53,7 +47,7 @@ fn main() {
         thread::spawn(move || xlogger::run_event_loop(should_run));
     };
 
-    let app = XloggerApp::new(should_run);
+    let app = XloggerApp { should_run };
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(Box::new(app), native_options);
 }
