@@ -86,7 +86,7 @@ fn main() {
     let mut left_stick_state = ControllerStickState { x: 0.0, y: 0.0 };
     let mut right_stick_state = ControllerStickState { x: 0.0, y: 0.0 };
 
-    println!("data file: {:?}", csv_path);
+    info!("data folder: {:?}", csv_path);
     println!("At any time, click into this window and press Ctrl-C to exit this program smoothly");
 
     loop {
