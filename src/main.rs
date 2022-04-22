@@ -190,11 +190,7 @@ fn main() {
 /// The current implementation outputs `warn` and above to the console and `debug` and above to
 /// a file.
 fn init_logger() {
-    let mut file_path = std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("./xlogger.exe"))
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf();
+    let mut file_path = get_exe_parent_dir();
     let filename = chrono::Local::now()
         .naive_local()
         .format("%Y-%m-%d %H-%M-%S.log")
@@ -238,10 +234,10 @@ fn create_dir_if_not_exists(file_path: &PathBuf) {
     });
 }
 
-/// Get the data folder. It resides alongside the executable.
+/// Gets the path to the directory containing the executable
 ///
-/// For example, if the executable is at `/path/to/executable`, the data folder is `/path/to/data`.
-fn get_data_folder() -> PathBuf {
+/// returns: PathBuf
+fn get_exe_parent_dir() -> PathBuf {
     std::env::current_exe()
         .unwrap_or_else(|_| {
             warn!("failed to get current executable path");
@@ -251,8 +247,18 @@ fn get_data_folder() -> PathBuf {
         .unwrap_or_else(|| {
             warn!("failed to get parent of executable");
             Path::new(".")
-        })
-        .join("data")
+        }).to_path_buf()
+}
+
+/// Get the data folder. It resides alongside the executable.
+///
+/// For example, if the executable is at `/path/to/executable`, the data folder is `/path/to/data`.
+///
+/// returns: PathBuf
+fn get_data_folder() -> PathBuf {
+    let mut folder = get_exe_parent_dir();
+    folder.push("data");
+    folder
 }
 
 /// The exit handler for the program. This is designed to be passed to the `ctrlc::set_handler`
@@ -280,12 +286,9 @@ fn exit_handler(
     button_writer_guard.flush().unwrap();
     stick_writer_guard.flush().unwrap();
     // pass the button data file to the visualize script
-    let visualize_script = std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("./xlogger.exe"))
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .join("visualize")
-        .join("visualize");
+    let mut visualize_script = get_exe_parent_dir();
+    visualize_script.push("visualize");
+    visualize_script.push("visualize");
     info!("launching visualization script");
     debug!("visualize path: {:?}", visualize_script);
     // spawn the visualize script and wait for it to finish
