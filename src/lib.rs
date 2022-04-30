@@ -134,7 +134,7 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                             error!(
                                 "failed to flush button csv writer with following error: {:?}",
                                 e
-                            )
+                            );
                         });
                     } else {
                         // only insert if it doesn't have a value (aka has the default value)

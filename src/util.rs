@@ -1,4 +1,4 @@
-use std::fs::create_dir;
+use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 
 use log::warn;
@@ -11,7 +11,7 @@ use log::warn;
 ///
 /// returns: ()
 pub fn create_dir_if_not_exists(file_path: &PathBuf) {
-    create_dir(&file_path).unwrap_or_else(|e| {
+    create_dir_all(&file_path).unwrap_or_else(|e| {
         if e.kind() == std::io::ErrorKind::AlreadyExists {
             return;
         }
@@ -24,7 +24,7 @@ pub fn create_dir_if_not_exists(file_path: &PathBuf) {
 
 /// Gets the path to the directory containing the executable
 ///
-/// returns: PathBuf
+/// returns: `PathBuf`
 pub fn get_exe_parent_dir() -> PathBuf {
     std::env::current_exe()
         .unwrap_or_else(|_| {
