@@ -1,10 +1,11 @@
 use std::fs::File;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::thread;
 
 use eframe::egui;
-use log::{info, LevelFilter};
+use log::{error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
@@ -29,6 +30,10 @@ impl eframe::App for XloggerApp {
                 info!("{}", log_message);
                 self.should_run
                     .store(!should_run_value, std::sync::atomic::Ordering::Relaxed);
+                let _closure = {
+                    let should_run = self.should_run.clone();
+                    thread::spawn(move || xlogger::listen_for_events(should_run));
+                };
             }
             if ui.button("Visualize").clicked() {
                 // opens to the data folder
@@ -37,21 +42,43 @@ impl eframe::App for XloggerApp {
                     .set_directory(get_exe_parent_dir().join("data"))
                     .pick_file()
                 {
-                    println!("{:?}", path);
+                    Self::visualize_data(path);
                 }
             }
         });
     }
 }
 
+impl XloggerApp {
+    fn visualize_data(path: PathBuf) {
+        info!("visualizing data from {}", path.display());
+        let visualize_script = get_exe_parent_dir().join("visualize").join("visualize");
+        let proc_result = std::process::Command::new(visualize_script)
+            .arg(path)
+            .spawn();
+        match proc_result {
+            Ok(mut child) => {
+                if let Ok(exit_status) = child.wait() {
+                    if !exit_status.success() {
+                        error!(
+                            "Visualization script exited with non-zero status: {:?}",
+                            exit_status
+                        );
+                    }
+                } else {
+                    error!("Process never started");
+                }
+            }
+            Err(e) => {
+                error!("Failed to spawn 'visualize' process: {}", e);
+            }
+        };
+    }
+}
+
 fn main() {
     init_logger();
     let should_run = Arc::new(AtomicBool::new(false));
-
-    let _ = {
-        let should_run = should_run.clone();
-        thread::spawn(move || xlogger::run_event_loop(should_run));
-    };
 
     let app = XloggerApp { should_run };
     let native_options = eframe::NativeOptions::default();
