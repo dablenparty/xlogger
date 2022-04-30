@@ -34,6 +34,15 @@ struct ControllerStickState {
     y: f32,
 }
 
+/// Starts an event loop that listens for controller events and writes them to a file.
+///
+/// This function is intended to run on a separate thread.
+///
+/// # Arguments
+///
+/// * `should_run`: Thread-safe boolean value that determines whether the event loop should continue
+///
+/// returns: ()
 pub fn listen_for_events(should_run: Arc<AtomicBool>) {
     // TODO: return a Result so the errors can be handled externally
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
