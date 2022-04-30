@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::thread;
 
-use eframe::{egui, epi};
+use eframe::egui;
 use log::{info, LevelFilter};
 use simplelog::{Config, WriteLogger};
 
@@ -15,8 +15,8 @@ struct XloggerApp {
     should_run: Arc<AtomicBool>,
 }
 
-impl epi::App for XloggerApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &epi::Frame) {
+impl eframe::App for XloggerApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let should_run_value = self.should_run.load(std::sync::atomic::Ordering::Relaxed);
             let text = if should_run_value { "Stop" } else { "Start" };
@@ -32,10 +32,6 @@ impl epi::App for XloggerApp {
             }
         });
     }
-
-    fn name(&self) -> &str {
-        "xlogger"
-    }
 }
 
 fn main() {
@@ -49,7 +45,14 @@ fn main() {
 
     let app = XloggerApp { should_run };
     let native_options = eframe::NativeOptions::default();
-    eframe::run_native(Box::new(app), native_options);
+    eframe::run_native(
+        "xlogger",
+        native_options,
+        Box::new(|cc| {
+            cc.egui_ctx.set_visuals(egui::Visuals::dark());
+            Box::new(app)
+        }),
+    );
 }
 
 /// Initializes the logging library
