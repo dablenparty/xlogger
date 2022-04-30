@@ -4,6 +4,7 @@ use std::time::SystemTime;
 
 use gilrs::{Axis, Gilrs};
 use log::{error, warn};
+use serde::Serialize;
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -117,22 +118,30 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                         );
                     }
                 }
-                gilrs::EventType::ButtonPressed(button, value, ..) => {
+                gilrs::EventType::ButtonChanged(button, value, ..) => {
                     let name = format!("{:?}", button);
 
                     if value == 0.0 {
-                        let down_time = time_map.get(&name).unwrap_or(&SystemTime::now());
-                        button_csv_writer.serialize(ControllerButtonEvent {
-                            press_time: down_time
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("time went backwards!")
-                                .as_secs_f64(),
-                            release_time: event_time
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("time went backwards!")
-                                .as_secs_f64(),
-                            button: name.clone(),
-                        });
+                        let now = &SystemTime::now();
+                        let down_time = time_map.get(&name).unwrap_or(now);
+                        button_csv_writer
+                            .serialize(ControllerButtonEvent {
+                                press_time: down_time
+                                    .duration_since(SystemTime::UNIX_EPOCH)
+                                    .expect("time went backwards!")
+                                    .as_secs_f64(),
+                                release_time: event_time
+                                    .duration_since(SystemTime::UNIX_EPOCH)
+                                    .expect("time went backwards!")
+                                    .as_secs_f64(),
+                                button: name.clone(),
+                            })
+                            .unwrap_or_else(|e| {
+                                error!(
+                                "failed to write button event to csv with following error: {:?}",
+                                e
+                            );
+                            });
                         time_map.insert(name, event_time);
                         button_csv_writer.flush().unwrap_or_else(|e| {
                             error!(
