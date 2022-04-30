@@ -134,9 +134,12 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                             button: name.clone(),
                         });
                         time_map.insert(name, event_time);
-                        button_csv_writer
-                            .flush()
-                            .expect("failed to flush button csv writer");
+                        button_csv_writer.flush().unwrap_or_else(|e| {
+                            error!(
+                                "failed to flush button csv writer with following error: {:?}",
+                                e
+                            )
+                        });
                     } else {
                         // only insert if it doesn't have a value (aka has the default value)
                         let map_time_opt = time_map.get(&name);
