@@ -106,7 +106,7 @@ fn init_logger() {
     create_dir_if_not_exists(&file_path);
     file_path.push(filename);
     WriteLogger::init(
-        LevelFilter::Debug,
+        LevelFilter::Info,
         Config::default(),
         File::create(&file_path).unwrap_or_else(|e| {
             eprintln!("Failed to create log file: {:?}", file_path);
