@@ -30,6 +30,16 @@ impl eframe::App for XloggerApp {
                 self.should_run
                     .store(!should_run_value, std::sync::atomic::Ordering::Relaxed);
             }
+            if ui.button("Visualize").clicked() {
+                // opens to the data folder
+                // if it doesn't exist, RFD defaults to the Documents folder
+                if let Some(path) = rfd::FileDialog::new()
+                    .set_directory(get_exe_parent_dir().join("data"))
+                    .pick_file()
+                {
+                    println!("{:?}", path);
+                }
+            }
         });
     }
 }

@@ -12,5 +12,6 @@ ctrlc = "3.2.1"
 eframe = "0.18.0"
 gilrs = "0.8.2"
 log = "0.4.16"
+rfd = "0.8.2"
 serde = { version = "1.0.136", features = ["derive"] }
 simplelog = { version = "^0.11.0", features = ["paris"] }
