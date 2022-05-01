@@ -110,8 +110,7 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                     let name = format!("{:?}", button);
 
                     if value == 0.0 {
-                        let now = &SystemTime::now();
-                        let down_time = time_map.get(&name).unwrap_or(now);
+                        let down_time = time_map.remove(&name).unwrap_or(SystemTime::now());
                         let button_event = ControllerButtonEvent {
                             press_time: down_time
                                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -130,8 +129,7 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                                 "failed to write button event <{:?}> to csv with following error: {:?}",
                                 button_event, e
                             );
-                            });
-                        time_map.insert(name, event_time);
+                        });
                         button_csv_writer.flush().unwrap_or_else(|e| {
                             error!(
                                 "failed to flush button csv writer with following error: {:?}",
