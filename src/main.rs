@@ -1,8 +1,9 @@
+use std::fs::File;
 use std::path::PathBuf;
+use std::process::ExitStatus;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::thread;
-use std::{fs::File, process::ExitStatus};
+use std::{io, thread};
 
 use eframe::egui;
 use log::{debug, error, info, LevelFilter};
@@ -62,7 +63,14 @@ impl eframe::App for XloggerApp {
 }
 
 impl XloggerApp {
-    fn visualize_data(path: PathBuf) -> std::io::Result<ExitStatus> {
+    /// Visualizes the data in the given file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file to visualize.
+    ///
+    /// returns: `io::Result<ExitStatus>`
+    fn visualize_data(path: PathBuf) -> io::Result<ExitStatus> {
         info!("visualizing data from {}", path.display());
         let visualize_script = get_exe_parent_dir().join("visualize").join("visualize");
         debug!("visualize script: {}", visualize_script.display());
