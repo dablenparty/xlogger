@@ -61,7 +61,7 @@ impl XloggerApp {
                 if let Ok(exit_status) = child.wait() {
                     if !exit_status.success() {
                         error!(
-                            "Visualization script exited with non-zero status: {:?}",
+                            "Visualization script exited with non-zero status: {}",
                             exit_status
                         );
                     }
@@ -70,7 +70,11 @@ impl XloggerApp {
                 }
             }
             Err(e) => {
-                error!("Failed to spawn 'visualize' process: {}", e);
+                error!(
+                    "Failed to spawn '{}' process: {}",
+                    visualize_script.display(),
+                    e
+                );
             }
         };
     }

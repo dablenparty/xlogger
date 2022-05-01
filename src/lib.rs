@@ -89,7 +89,7 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                             warn!("unhandled axis event: {:?}", event);
                         }
                     }
-                    if let Err(e) = stick_csv_writer.serialize(ControllerStickEvent {
+                    let stick_event = ControllerStickEvent {
                         time: event_time
                             .duration_since(SystemTime::UNIX_EPOCH)
                             .expect("time went backwards!")
@@ -98,10 +98,11 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                         left_y: left_stick_state.y,
                         right_x: right_stick_state.x,
                         right_y: right_stick_state.y,
-                    }) {
+                    };
+                    if let Err(e) = stick_csv_writer.serialize(stick_event) {
                         error!(
-                            "failed to write stick event to csv with following error: {:?}",
-                            e
+                            "failed to write stick event <{:?}> to csv with following error: {:?}",
+                            stick_event, e
                         );
                     }
                 }
@@ -111,22 +112,23 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                     if value == 0.0 {
                         let now = &SystemTime::now();
                         let down_time = time_map.get(&name).unwrap_or(now);
+                        let button_event = ControllerButtonEvent {
+                            press_time: down_time
+                                .duration_since(SystemTime::UNIX_EPOCH)
+                                .expect("time went backwards!")
+                                .as_secs_f64(),
+                            release_time: event_time
+                                .duration_since(SystemTime::UNIX_EPOCH)
+                                .expect("time went backwards!")
+                                .as_secs_f64(),
+                            button: name.clone(),
+                        };
                         button_csv_writer
-                            .serialize(ControllerButtonEvent {
-                                press_time: down_time
-                                    .duration_since(SystemTime::UNIX_EPOCH)
-                                    .expect("time went backwards!")
-                                    .as_secs_f64(),
-                                release_time: event_time
-                                    .duration_since(SystemTime::UNIX_EPOCH)
-                                    .expect("time went backwards!")
-                                    .as_secs_f64(),
-                                button: name.clone(),
-                            })
+                            .serialize(button_event)
                             .unwrap_or_else(|e| {
                                 error!(
-                                "failed to write button event to csv with following error: {:?}",
-                                e
+                                "failed to write button event <{:?}> to csv with following error: {:?}",
+                                button_event, e
                             );
                             });
                         time_map.insert(name, event_time);
