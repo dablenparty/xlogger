@@ -110,7 +110,7 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                     let name = format!("{:?}", button);
 
                     if value == 0.0 {
-                        let down_time = time_map.remove(&name).unwrap_or(SystemTime::now());
+                        let down_time = time_map.remove(&name).unwrap_or_else(SystemTime::now);
                         let button_event = ControllerButtonEvent {
                             press_time: down_time
                                 .duration_since(SystemTime::UNIX_EPOCH)
