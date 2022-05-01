@@ -53,7 +53,7 @@ impl XloggerApp {
     fn visualize_data(path: PathBuf) {
         info!("visualizing data from {}", path.display());
         let visualize_script = get_exe_parent_dir().join("visualize").join("visualize");
-        let proc_result = std::process::Command::new(visualize_script)
+        let proc_result = std::process::Command::new(&visualize_script)
             .arg(path)
             .spawn();
         match proc_result {

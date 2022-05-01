@@ -99,7 +99,7 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                         right_x: right_stick_state.x,
                         right_y: right_stick_state.y,
                     };
-                    if let Err(e) = stick_csv_writer.serialize(stick_event) {
+                    if let Err(e) = stick_csv_writer.serialize(&stick_event) {
                         error!(
                             "failed to write stick event <{:?}> to csv with following error: {:?}",
                             stick_event, e
@@ -124,7 +124,7 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                             button: name.clone(),
                         };
                         button_csv_writer
-                            .serialize(button_event)
+                            .serialize(&button_event)
                             .unwrap_or_else(|e| {
                                 error!(
                                 "failed to write button event <{:?}> to csv with following error: {:?}",
