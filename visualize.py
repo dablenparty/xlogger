@@ -4,7 +4,11 @@ import sys
 
 
 def visualize_data(csv_file):
-    df = pd.read_csv(csv_file)
+    try:
+        df = pd.read_csv(csv_file)
+    except pd.errors.EmptyDataError:
+        print(f'No data found in {csv_file}')
+        sys.exit(1)
     # print(df.head())
     df['HoldDuration'] = round(df['ReleaseTime'] - df['PressTime'], 3)
     df['PressTime'] = pd.to_datetime(df['PressTime'], unit='s')
