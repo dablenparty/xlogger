@@ -1,2 +1,2 @@
-pyinstaller --distpath .\target\debug .\visualize.py
+pyinstaller --distpath --noconfirm .\target\debug .\visualize.py
 cargo build
