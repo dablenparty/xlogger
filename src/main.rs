@@ -49,12 +49,12 @@ impl eframe::App for XloggerApp {
                     .set_directory(get_exe_parent_dir().join("data"))
                     .pick_file()
                 {
-                    match Self::visualize_data(path) {
+                    thread::spawn(move || match Self::visualize_data(path) {
                         Ok(exit_status) => {
                             info!("Visualization exited with status {}", exit_status)
                         }
                         Err(e) => error!("{}", e),
-                    };
+                    });
                 }
             };
         });
@@ -63,7 +63,6 @@ impl eframe::App for XloggerApp {
 
 impl XloggerApp {
     fn visualize_data(path: PathBuf) -> std::io::Result<ExitStatus> {
-        // TODO: run this function in a separate thread
         info!("visualizing data from {}", path.display());
         let visualize_script = get_exe_parent_dir().join("visualize").join("visualize");
         debug!("visualize script: {}", visualize_script.display());
