@@ -1,4 +1,5 @@
 use std::fs::create_dir_all;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use log::warn;
@@ -10,16 +11,17 @@ use log::warn;
 /// * `file_path`: the path to the directory
 ///
 /// returns: ()
-pub fn create_dir_if_not_exists(file_path: &PathBuf) {
-    create_dir_all(&file_path).unwrap_or_else(|e| {
-        if e.kind() == std::io::ErrorKind::AlreadyExists {
-            return;
+pub fn create_dir_if_not_exists(file_path: &PathBuf) -> io::Result<()> {
+    if let Err(e) = create_dir_all(&file_path) {
+        if e.kind() == io::ErrorKind::AlreadyExists {
+            warn!("{} already exists", file_path.display());
+            Ok(())
+        } else {
+            Err(e)
         }
-        // initialization of the logging library uses this function, so we can't use the error!
-        // macro here
-        eprintln!("{:?}", e);
-        std::process::exit(1);
-    });
+    } else {
+        Ok(())
+    }
 }
 
 /// Gets the path to the directory containing the executable

@@ -48,7 +48,8 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
 
     let data_folder = get_exe_parent_dir().join("data");
-    create_dir_if_not_exists(&data_folder);
+    create_dir_if_not_exists(&data_folder)
+        .expect(format!("failed to create data folder at {}", data_folder.display()).as_str());
     let timestamp_string = chrono::Local::now()
         .naive_local()
         .format("%Y-%m-%d_%H-%M-%S.csv")
