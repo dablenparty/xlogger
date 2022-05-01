@@ -25,15 +25,16 @@ impl eframe::App for XloggerApp {
                 let log_message = if should_run_value {
                     "stopped listening to controllers"
                 } else {
+                    // also starts the event loop thread
+                    let _closure = {
+                        let should_run = self.should_run.clone();
+                        thread::spawn(move || xlogger::listen_for_events(should_run));
+                    };
                     "started listening to controllers"
                 };
                 info!("{}", log_message);
                 self.should_run
                     .store(!should_run_value, std::sync::atomic::Ordering::Relaxed);
-                let _closure = {
-                    let should_run = self.should_run.clone();
-                    thread::spawn(move || xlogger::listen_for_events(should_run));
-                };
             }
             if ui.button("Visualize").clicked() {
                 // opens to the data folder
