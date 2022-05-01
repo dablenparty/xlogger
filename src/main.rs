@@ -97,7 +97,10 @@ impl XloggerApp {
 }
 
 fn main() {
-    init_logger();
+    if let Err(e) = init_logger() {
+        error!("{}", e);
+        std::process::exit(1);
+    };
     let should_run = Arc::new(AtomicBool::new(false));
 
     let app = XloggerApp {
@@ -119,14 +122,14 @@ fn main() {
 ///
 /// The current implementation outputs `warn` and above to the console and `debug` and above to
 /// a file.
-fn init_logger() {
+fn init_logger() -> io::Result<()> {
     let mut file_path = get_exe_parent_dir();
     let filename = chrono::Local::now()
         .naive_local()
         .format("%Y-%m-%d %H-%M-%S.log")
         .to_string();
     file_path.push("logs");
-    create_dir_if_not_exists(&file_path);
+    create_dir_if_not_exists(&file_path)?;
     file_path.push(filename);
     WriteLogger::init(
         LevelFilter::Info,
@@ -138,4 +141,5 @@ fn init_logger() {
         }),
     )
     .expect("Failed to initialize logger");
+    Ok(())
 }
