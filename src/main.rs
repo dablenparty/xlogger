@@ -1,19 +1,21 @@
-use std::fs::File;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::thread;
+use std::{fs::File, process::ExitStatus};
 
 use eframe::egui;
-use log::{error, info, LevelFilter};
+use log::{debug, error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
 mod util;
 
+#[derive(Default)]
 struct XloggerApp {
     should_run: Arc<AtomicBool>,
+    saved_text: String,
 }
 
 impl eframe::App for XloggerApp {
@@ -21,21 +23,25 @@ impl eframe::App for XloggerApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             let should_run_value = self.should_run.load(std::sync::atomic::Ordering::Relaxed);
             let text = if should_run_value { "Stop" } else { "Start" };
-            if ui.button(text).clicked() {
-                let log_message = if should_run_value {
-                    "stopped listening to controllers"
-                } else {
-                    // also starts the event loop thread
-                    let _closure = {
-                        let should_run = self.should_run.clone();
-                        thread::spawn(move || xlogger::listen_for_events(should_run));
+            ui.horizontal(|ui| {
+                if ui.button(text).clicked() {
+                    let (log_message, saved_text) = if should_run_value {
+                        ("stopped listening to controllers", "Saved!".to_owned())
+                    } else {
+                        // also starts the event loop thread
+                        let _closure = {
+                            let should_run = self.should_run.clone();
+                            thread::spawn(move || xlogger::listen_for_events(should_run));
+                        };
+                        ("started listening to controllers", "".to_owned())
                     };
-                    "started listening to controllers"
-                };
-                info!("{}", log_message);
-                self.should_run
-                    .store(!should_run_value, std::sync::atomic::Ordering::Relaxed);
-            }
+                    self.saved_text = saved_text;
+                    info!("{}", log_message);
+                    self.should_run
+                        .store(!should_run_value, std::sync::atomic::Ordering::Relaxed);
+                }
+                ui.label(&self.saved_text);
+            });
             if ui.button("Visualize").clicked() {
                 // opens to the data folder
                 // if it doesn't exist, RFD defaults to the Documents folder
@@ -43,41 +49,43 @@ impl eframe::App for XloggerApp {
                     .set_directory(get_exe_parent_dir().join("data"))
                     .pick_file()
                 {
-                    Self::visualize_data(path);
+                    match Self::visualize_data(path) {
+                        Ok(exit_status) => {
+                            info!("Visualization exited with status {}", exit_status)
+                        }
+                        Err(e) => error!("{}", e),
+                    };
                 }
-            }
+            };
         });
     }
 }
 
 impl XloggerApp {
-    fn visualize_data(path: PathBuf) {
+    fn visualize_data(path: PathBuf) -> std::io::Result<ExitStatus> {
+        // TODO: run this function in a separate thread
         info!("visualizing data from {}", path.display());
         let visualize_script = get_exe_parent_dir().join("visualize").join("visualize");
-        let proc_result = std::process::Command::new(&visualize_script)
+        debug!("visualize script: {}", visualize_script.display());
+        let mut child_proc = std::process::Command::new(&visualize_script)
             .arg(path)
-            .spawn();
-        match proc_result {
-            Ok(mut child) => {
-                if let Ok(exit_status) = child.wait() {
-                    if !exit_status.success() {
-                        error!(
-                            "Visualization script exited with non-zero status: {}",
-                            exit_status
-                        );
-                    }
-                } else {
-                    error!("Process never started");
-                }
-            }
-            Err(e) => {
-                error!(
-                    "Failed to spawn '{}' process: {}",
-                    visualize_script.display(),
-                    e
-                );
-            }
-        };
+            .spawn()?;
+        let exit_status = child_proc.wait()?;
+        if !exit_status.success() {
+            error!(
+                "Visualization script exited with non-zero status: {}",
+                exit_status
+            );
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!(
+                    "Visualization script exited with non-zero status: {:?}",
+                    exit_status
+                ),
+            ))
+        } else {
+            Ok(exit_status)
+        }
     }
 }
 
@@ -85,7 +93,10 @@ fn main() {
     init_logger();
     let should_run = Arc::new(AtomicBool::new(false));
 
-    let app = XloggerApp { should_run };
+    let app = XloggerApp {
+        should_run,
+        ..Default::default()
+    };
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
         "xlogger",
