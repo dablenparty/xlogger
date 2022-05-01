@@ -13,6 +13,8 @@ use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
 mod util;
 
+type BoxedResult<T> = Result<T, Box<dyn std::error::Error>>;
+
 #[derive(Default)]
 struct XloggerApp {
     should_run: Arc<AtomicBool>,
@@ -98,7 +100,7 @@ impl XloggerApp {
 
 fn main() {
     if let Err(e) = init_logger() {
-        error!("{}", e);
+        eprintln!("{}", e);
         std::process::exit(1);
     };
     let should_run = Arc::new(AtomicBool::new(false));
@@ -122,7 +124,7 @@ fn main() {
 ///
 /// The current implementation outputs `warn` and above to the console and `debug` and above to
 /// a file.
-fn init_logger() -> io::Result<()> {
+fn init_logger() -> BoxedResult<()> {
     let mut file_path = get_exe_parent_dir();
     let filename = chrono::Local::now()
         .naive_local()
@@ -134,12 +136,7 @@ fn init_logger() -> io::Result<()> {
     WriteLogger::init(
         LevelFilter::Info,
         Config::default(),
-        File::create(&file_path).unwrap_or_else(|e| {
-            eprintln!("Failed to create log file: {:?}", file_path);
-            eprintln!("{:?}", e);
-            std::process::exit(1);
-        }),
-    )
-    .expect("Failed to initialize logger");
+        File::create(&file_path)?,
+    )?;
     Ok(())
 }
