@@ -10,6 +10,8 @@ use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
 mod util;
 
+pub type BoxedResult<T> = Result<T, Box<dyn std::error::Error>>;
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "PascalCase")]
 struct ControllerButtonEvent {

@@ -8,12 +8,11 @@ use std::{io, thread};
 use eframe::egui;
 use log::{debug, error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
+use xlogger::BoxedResult;
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
 mod util;
-
-type BoxedResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Default)]
 struct XloggerApp {
