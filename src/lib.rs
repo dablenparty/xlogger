@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::time::SystemTime;
 
@@ -45,13 +46,12 @@ struct ControllerStickState {
 /// * `should_run`: Thread-safe boolean value that determines whether the event loop should continue
 ///
 /// returns: ()
-pub fn listen_for_events(should_run: Arc<AtomicBool>) {
-    // TODO: return a Result so the errors can be handled externally
+pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
+    // if this fails, the event loop can never run
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
 
     let data_folder = get_exe_parent_dir().join("data");
-    create_dir_if_not_exists(&data_folder)
-        .expect(format!("failed to create data folder at {}", data_folder.display()).as_str());
+    create_dir_if_not_exists(&data_folder)?;
     let timestamp_string = chrono::Local::now()
         .naive_local()
         .format("%Y-%m-%d_%H-%M-%S.csv")
@@ -62,10 +62,8 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
     let stick_csv_path = data_folder.join("sticks_".to_owned() + &timestamp_string);
 
     // csv writers
-    let mut button_csv_writer =
-        csv::Writer::from_path(button_csv_path).expect("failed to create button csv writer");
-    let mut stick_csv_writer =
-        csv::Writer::from_path(stick_csv_path).expect("failed to create stick csv writer");
+    let mut button_csv_writer = csv::Writer::from_path(button_csv_path)?;
+    let mut stick_csv_writer = csv::Writer::from_path(stick_csv_path)?;
 
     // time map
     let mut time_map: HashMap<String, SystemTime> = HashMap::new();
@@ -125,20 +123,8 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
                                 .as_secs_f64(),
                             button: name.clone(),
                         };
-                        button_csv_writer
-                            .serialize(&button_event)
-                            .unwrap_or_else(|e| {
-                                error!(
-                                "failed to write button event <{:?}> to csv with following error: {:?}",
-                                button_event, e
-                            );
-                        });
-                        button_csv_writer.flush().unwrap_or_else(|e| {
-                            error!(
-                                "failed to flush button csv writer with following error: {:?}",
-                                e
-                            );
-                        });
+                        button_csv_writer.serialize(&button_event)?;
+                        button_csv_writer.flush()?;
                     } else {
                         // only insert if it doesn't have a value (aka has the default value)
                         let map_time_opt = time_map.get(&name);
@@ -153,4 +139,5 @@ pub fn listen_for_events(should_run: Arc<AtomicBool>) {
             }
         }
     }
+    Ok(())
 }

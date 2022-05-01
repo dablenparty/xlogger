@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::PathBuf;
 use std::process::ExitStatus;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{io, thread};
 
@@ -23,7 +23,7 @@ struct XloggerApp {
 impl eframe::App for XloggerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            let should_run_value = self.should_run.load(std::sync::atomic::Ordering::Relaxed);
+            let should_run_value = self.should_run.load(Ordering::Relaxed);
             let text = if should_run_value { "Stop" } else { "Start" };
             ui.horizontal(|ui| {
                 if ui.button(text).clicked() {
@@ -33,14 +33,19 @@ impl eframe::App for XloggerApp {
                         // also starts the event loop thread
                         let _closure = {
                             let should_run = self.should_run.clone();
-                            thread::spawn(move || xlogger::listen_for_events(should_run));
+                            thread::spawn(move || {
+                                if let Err(e) = xlogger::listen_for_events(&should_run) {
+                                    error!("{:?}", e);
+                                    should_run.store(false, Ordering::Relaxed);
+                                }
+                            });
                         };
                         ("started listening to controllers", "".to_owned())
                     };
                     self.saved_text = saved_text;
                     info!("{}", log_message);
                     self.should_run
-                        .store(!should_run_value, std::sync::atomic::Ordering::Relaxed);
+                        .store(!should_run_value, Ordering::Relaxed);
                 }
                 ui.label(&self.saved_text);
             });
@@ -55,7 +60,7 @@ impl eframe::App for XloggerApp {
                         Ok(exit_status) => {
                             info!("Visualization exited with status {}", exit_status)
                         }
-                        Err(e) => error!("{}", e),
+                        Err(e) => error!("{:?}", e),
                     });
                 }
             };
