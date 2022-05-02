@@ -5,11 +5,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{io, thread};
 
-use eframe::egui;
+use eframe::egui::plot::{Plot, Points, Value, Values};
+use eframe::egui::{self, Ui, Window};
 use human_panic::setup_panic;
-use log::{debug, error, info, LevelFilter};
+use log::{debug, error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
-use xlogger::BoxedResult;
+use xlogger::{BoxedResult, ControllerStickEvent};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -19,6 +20,8 @@ mod util;
 struct XloggerApp {
     should_run: Arc<AtomicBool>,
     saved_text: String,
+    show_stick_window: bool,
+    visualize_path: PathBuf,
 }
 
 impl eframe::App for XloggerApp {
@@ -56,14 +59,20 @@ impl eframe::App for XloggerApp {
                     .set_directory(get_exe_parent_dir().join("data"))
                     .pick_file()
                 {
-                    thread::spawn(move || match Self::visualize_button_data(path) {
-                        Ok(exit_status) => {
-                            info!("Visualization exited with status {}", exit_status)
-                        }
-                        Err(e) => error!("{:?}", e),
-                    });
+                    // thread::spawn(move || match Self::visualize_button_data(path) {
+                    //     Ok(exit_status) => {
+                    //         info!("Visualization exited with status {}", exit_status)
+                    //     }
+                    //     Err(e) => error!("{:?}", e),
+                    // });
+                    self.show_stick_window = true;
+                    self.visualize_path = path;
                 }
             };
+            let p = self.visualize_path.clone();
+            Window::new("Stick Data")
+                .open(&mut self.show_stick_window)
+                .show(ctx, |ui| Self::visualize_stick_data(p, ui));
         });
     }
 }
@@ -99,6 +108,27 @@ impl XloggerApp {
         } else {
             Ok(exit_status)
         }
+    }
+
+    fn visualize_stick_data(path: PathBuf, ui: &mut Ui) -> io::Result<egui::Response> {
+        let events: Vec<_> = csv::Reader::from_path(path)?
+            .deserialize::<ControllerStickEvent>()
+            .filter_map(|result| match result {
+                Ok(event) => Some(event),
+                Err(e) => {
+                    warn!("A CSV record threw an error: {:?}", e);
+                    None
+                }
+            })
+            .map(|event| Value::new(event.left_x, event.left_y))
+            .collect();
+        let points = Points::new(Values::from_values(events)).radius(0.5);
+        Ok(Plot::new("Stick Data")
+            .data_aspect(1.0)
+            .show(ui, |plot_ui| {
+                plot_ui.points(points.name("Left Stick"));
+            })
+            .response)
     }
 }
 

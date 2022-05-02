@@ -5,7 +5,7 @@ use std::time::SystemTime;
 
 use gilrs::{Axis, Gilrs};
 use log::{error, warn};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -21,14 +21,14 @@ struct ControllerButtonEvent {
     button: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-struct ControllerStickEvent {
-    time: f64,
-    left_x: f32,
-    left_y: f32,
-    right_x: f32,
-    right_y: f32,
+pub struct ControllerStickEvent {
+    pub time: f64,
+    pub left_x: f32,
+    pub left_y: f32,
+    pub right_x: f32,
+    pub right_y: f32,
 }
 
 #[derive(Debug, Default)]
