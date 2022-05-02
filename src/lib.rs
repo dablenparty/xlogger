@@ -112,14 +112,16 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
 
                     if value == 0.0 {
                         let down_time = time_map.remove(&name).unwrap_or_else(SystemTime::now);
+                        // expect is used here because the time should never be before the epoch
+                        // if it is, something bigger is wrong
                         let button_event = ControllerButtonEvent {
                             press_time: down_time
                                 .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("time went backwards!")
+                                .expect("time was before the epoch!")
                                 .as_secs_f64(),
                             release_time: event_time
                                 .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("time went backwards!")
+                                .expect("time was before the epoch!")
                                 .as_secs_f64(),
                             button: name.clone(),
                         };

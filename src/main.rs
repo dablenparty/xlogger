@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::{io, thread};
 
 use eframe::egui;
+use human_panic::setup_panic;
 use log::{debug, error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::BoxedResult;
@@ -44,8 +45,7 @@ impl eframe::App for XloggerApp {
                     };
                     self.saved_text = saved_text;
                     info!("{}", log_message);
-                    self.should_run
-                        .store(!should_run_value, Ordering::Relaxed);
+                    self.should_run.store(!should_run_value, Ordering::Relaxed);
                 }
                 ui.label(&self.saved_text);
             });
@@ -103,9 +103,19 @@ impl XloggerApp {
 }
 
 fn main() {
+    // traditionally, this is used for CLI's
+    // in the case that this GUI does crash, this
+    // will auto-generate a log which is what I
+    // care about
+    setup_panic!(human_panic::Metadata {
+        name: env!("CARGO_PKG_NAME").into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        authors: "dablenparty".into(),
+        homepage: "N/A".into(),
+    });
     if let Err(e) = init_logger() {
-        eprintln!("{}", e);
-        std::process::exit(1);
+        // do not allow the program to continue without logging
+        panic!("Something went wrong initializing logging: {}", e);
     };
     let should_run = Arc::new(AtomicBool::new(false));
 
