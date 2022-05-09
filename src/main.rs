@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -21,7 +21,8 @@ struct XloggerApp {
     should_run: Arc<AtomicBool>,
     saved_text: String,
     show_stick_window: bool,
-    visualize_path: PathBuf,
+    visualize_path: Option<PathBuf>,
+    slider_timestamp: u64,
 }
 
 impl eframe::App for XloggerApp {
@@ -52,27 +53,36 @@ impl eframe::App for XloggerApp {
                 }
                 ui.label(&self.saved_text);
             });
-            if ui.button("Visualize").clicked() {
-                // opens to the data folder
-                // if it doesn't exist, RFD defaults to the Documents folder
-                if let Some(path) = rfd::FileDialog::new()
-                    .set_directory(get_exe_parent_dir().join("data"))
-                    .pick_file()
-                {
-                    // thread::spawn(move || match Self::visualize_button_data(path) {
-                    //     Ok(exit_status) => {
-                    //         info!("Visualization exited with status {}", exit_status)
-                    //     }
-                    //     Err(e) => error!("{:?}", e),
-                    // });
-                    self.show_stick_window = true;
-                    self.visualize_path = path;
+            ui.horizontal(|ui| {
+                if ui.button("Visualize Sticks").clicked() {
+                    // opens to the data folder
+                    // if it doesn't exist, RFD defaults to the Documents folder
+                    if let Some(path) = rfd::FileDialog::new()
+                        .set_directory(get_exe_parent_dir().join("data"))
+                        .pick_file()
+                    {
+                        self.show_stick_window = true;
+                        self.visualize_path = Some(path);
+                    }
+                };
+                if ui.button("Visualize Buttons").clicked() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .set_directory(get_exe_parent_dir().join("data"))
+                        .pick_file()
+                    {
+                        thread::spawn(move || match Self::visualize_button_data(path) {
+                            Ok(exit_status) => {
+                                info!("Visualization exited with status {}", exit_status)
+                            }
+                            Err(e) => error!("{:?}", e),
+                        });
+                    }
                 }
-            };
-            let p = self.visualize_path.clone();
-            Window::new("Stick Data")
-                .open(&mut self.show_stick_window)
-                .show(ctx, |ui| Self::visualize_stick_data(p, ui));
+            });
+            // show sticks plot or handle error
+            if let Err(e) = self.visualize_stick_data(ui) {
+                error!("{:?}", e);
+            }
         });
     }
 }
@@ -110,7 +120,12 @@ impl XloggerApp {
         }
     }
 
-    fn visualize_stick_data(path: PathBuf, ui: &mut Ui) -> io::Result<egui::Response> {
+    fn visualize_stick_data(&mut self, ui: &mut Ui) -> io::Result<Option<egui::Response>> {
+        if let None = self.visualize_path {
+            return Ok(None);
+        }
+        // at this point, we know it's not None
+        let path = self.visualize_path.as_ref().unwrap();
         let events: Vec<_> = csv::Reader::from_path(path)?
             .deserialize::<ControllerStickEvent>()
             .filter_map(|result| match result {
@@ -122,13 +137,22 @@ impl XloggerApp {
             })
             .map(|event| Value::new(event.left_x, event.left_y))
             .collect();
-        let points = Points::new(Values::from_values(events)).radius(0.5);
-        Ok(Plot::new("Stick Data")
-            .data_aspect(1.0)
-            .show(ui, |plot_ui| {
-                plot_ui.points(points.name("Left Stick"));
-            })
-            .response)
+        ui.add(egui::Slider::new(
+            &mut self.slider_timestamp,
+            0..=((events.len() as u64) - 1),
+        ));
+        // take min of the timestamp + 100 and the length of the events
+        let sliced = &events[self.slider_timestamp as usize
+            ..(self.slider_timestamp as usize + 100).min(events.len())];
+        let points = Points::new(Values::from_values(sliced.to_vec())).radius(0.5);
+        Ok(Some(
+            Plot::new("Stick Data")
+                .data_aspect(1.0)
+                .show(ui, |plot_ui| {
+                    plot_ui.points(points.name("Left Stick"));
+                })
+                .response,
+        ))
     }
 }
 
