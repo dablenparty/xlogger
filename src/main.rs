@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
 use std::process::ExitStatus;
@@ -8,7 +9,7 @@ use std::{io, thread};
 use eframe::egui::plot::{Legend, Line, Plot, Points, Value, Values};
 use eframe::egui::{self, Ui};
 use human_panic::setup_panic;
-use log::{debug, error, info, warn, LevelFilter};
+use log::{debug, error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::{open_dialog_in_data_folder, BoxedResult, ControllerStickEvent};
 
@@ -76,7 +77,13 @@ impl eframe::App for XloggerApp {
             });
             // show sticks plot or handle error
             if let Err(e) = self.visualize_stick_data(ui) {
-                error!("{:?}", e);
+                error!(
+                    "Something went wrong deserializing data at {:#?}:",
+                    self.visualize_path
+                );
+                error!("{}", e);
+                self.visualize_path = None;
+                self.show_stick_window = false;
             }
         });
     }
@@ -115,7 +122,10 @@ impl XloggerApp {
         }
     }
 
-    fn visualize_stick_data(&mut self, ui: &mut Ui) -> io::Result<Option<egui::Response>> {
+    fn visualize_stick_data(
+        &mut self,
+        ui: &mut Ui,
+    ) -> Result<Option<egui::Response>, Box<dyn Error>> {
         if self.visualize_path.is_none() {
             return Ok(None);
         }
@@ -123,18 +133,15 @@ impl XloggerApp {
         let path = self.visualize_path.as_ref().unwrap();
         let (ls_events, rs_events) = csv::Reader::from_path(path)?
             .deserialize::<ControllerStickEvent>()
-            .filter_map(|result| match result {
-                Ok(event) => Some(event),
-                Err(e) => {
-                    warn!("A CSV record threw an error: {:?}", e);
-                    None
-                }
-            })
-            .fold((Vec::new(), Vec::new()), |mut acc, element| {
-                acc.0.push(Value::new(element.left_x, element.left_y));
-                acc.1.push(Value::new(element.right_x, element.right_y));
-                (acc.0, acc.1)
-            });
+            .try_fold::<_, _, Result<(Vec<Value>, Vec<Value>), Box<dyn Error>>>(
+                (Vec::new(), Vec::new()),
+                |mut acc, result| {
+                    let event = result?;
+                    acc.0.push(Value::new(event.left_x, event.left_y));
+                    acc.1.push(Value::new(event.right_x, event.right_y));
+                    Ok((acc.0, acc.1))
+                },
+            )?;
         // TODO maybe add a slider for this offset (and a warning about performance)
         let forward_offset = 200;
 
