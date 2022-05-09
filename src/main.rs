@@ -38,7 +38,7 @@ impl eframe::App for XloggerApp {
                         ("stopped listening to controllers", "Saved!".to_owned())
                     } else {
                         // also starts the event loop thread
-                        let _closure = {
+                        {
                             let should_run = self.should_run.clone();
                             thread::spawn(move || {
                                 if let Err(e) = xlogger::listen_for_events(&should_run) {
@@ -68,7 +68,7 @@ impl eframe::App for XloggerApp {
                     if let Some(path) = open_dialog_in_data_folder() {
                         thread::spawn(move || match Self::visualize_button_data(path) {
                             Ok(exit_status) => {
-                                info!("Visualization exited with status {}", exit_status)
+                                info!("Visualization exited with status {}", exit_status);
                             }
                             Err(e) => error!("{:?}", e),
                         });
@@ -105,7 +105,9 @@ impl XloggerApp {
             .arg(path)
             .spawn()?;
         let exit_status = child_proc.wait()?;
-        if !exit_status.success() {
+        if exit_status.success() {
+            Ok(exit_status)
+        } else {
             error!(
                 "Visualization script exited with non-zero status: {}",
                 exit_status
@@ -117,11 +119,21 @@ impl XloggerApp {
                     exit_status
                 ),
             ))
-        } else {
-            Ok(exit_status)
         }
     }
 
+    /// Visualizes the stick data in the given file.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI to draw to.
+    ///
+    /// # Errors
+    ///
+    /// This function errors if there is an issue reading the CSV file defined by `self.visualize_path`
+    /// or if there is an issue deserializing the data such as malformed, missing, or extra columns.
+    ///
+    /// returns: `Result<Option<egui::Response>, Box<dyn Error>>`
     fn visualize_stick_data(
         &mut self,
         ui: &mut Ui,
@@ -218,7 +230,7 @@ fn main() {
 
     let app = XloggerApp {
         should_run,
-        ..Default::default()
+        ..XloggerApp::default()
     };
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(

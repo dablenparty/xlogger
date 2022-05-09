@@ -58,6 +58,10 @@ pub fn open_dialog_in_data_folder() -> Option<PathBuf> {
 /// # Arguments
 ///
 /// * `should_run`: Thread-safe boolean value that determines whether the event loop should continue
+/// 
+/// # Errors
+/// 
+/// This function will error if something goes wrong creating the CSV files or writing to them.
 ///
 /// returns: ()
 pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
