@@ -236,31 +236,4 @@ impl StatefulText {
         };
         ui.colored_label(color, &self.text);
     }
-
-    /// Sets the color for the success state.
-    ///
-    /// # Arguments
-    ///
-    /// * `success_color`: The color to use for success.
-    pub fn set_success(&mut self, success_color: Color32) {
-        self.success_color = success_color;
-    }
-
-    /// Sets the color for the error state
-    ///
-    /// # Arguments
-    ///
-    /// * `error_color`: The color to use for error.
-    pub fn set_error(&mut self, error_color: Color32) {
-        self.error_color = error_color;
-    }
-
-    /// Sets the color for the warning state
-    ///
-    /// # Arguments
-    ///
-    /// * `warning_color`: The color to use for warning.
-    pub fn set_warning(&mut self, warning_color: Color32) {
-        self.warning_color = warning_color;
-    }
 }
