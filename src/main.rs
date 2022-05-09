@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{io, thread};
 
-use eframe::egui::plot::{Plot, Points, Value, Values};
+use eframe::egui::plot::{Legend, Line, Plot, Points, Value, Values};
 use eframe::egui::{self, Ui};
 use human_panic::setup_panic;
 use log::{debug, error, info, warn, LevelFilter};
@@ -131,17 +131,20 @@ impl XloggerApp {
             })
             .map(|event| Value::new(event.left_x, event.left_y))
             .collect();
+        // TODO: add a slider for this offset (and a warning about performance)
+        let forward_offset = 200;
         ui.add(egui::Slider::new(
             &mut self.slider_timestamp,
-            0..=((events.len() as u64) - 1),
+            0..=((events.len() as u64) - forward_offset),
         ));
         // take min of the timestamp + 100 and the length of the events
         let sliced = &events[self.slider_timestamp as usize
-            ..(self.slider_timestamp as usize + 100).min(events.len())];
+            ..(self.slider_timestamp as usize + forward_offset).min(events.len())];
         let points = Points::new(Values::from_values(sliced.to_vec())).radius(0.5);
         Ok(Some(
             Plot::new("Stick Data")
                 .data_aspect(1.0)
+                .legend(Legend::default())
                 .show(ui, |plot_ui| {
                     plot_ui.points(points.name("Left Stick"));
                 })
