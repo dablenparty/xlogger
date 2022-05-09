@@ -189,18 +189,10 @@ pub struct StatefulText {
     default_color: Color32,
 }
 
-impl StatefulText {
-    /// Creates a default stateful text from some String.
-    ///
-    ///
-    /// # Arguments
-    ///
-    /// * `text`: The text to display.
-    ///
-    /// returns: `StatefulText`
-    pub fn default(text: String) -> Self {
+impl Default for StatefulText {
+    fn default() -> Self {
         Self {
-            text,
+            text: String::default(),
             state: TextState::Default,
             success_color: Color32::GREEN,
             error_color: Color32::RED,
@@ -208,7 +200,9 @@ impl StatefulText {
             default_color: Color32::WHITE,
         }
     }
+}
 
+impl StatefulText {
     /// Creates a new `StatefulText` from some String and a `TextState`.
     ///
     /// # Arguments
