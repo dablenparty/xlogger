@@ -172,6 +172,13 @@ pub enum TextState {
     Default,
 }
 
+/// Text that has a state associated with it.
+///
+/// By default, the colors are as follows:
+///
+/// * Success: green
+/// * Error: red
+/// * Warning: yellow
 #[derive(Debug)]
 pub struct StatefulText {
     pub text: String,
@@ -183,6 +190,14 @@ pub struct StatefulText {
 }
 
 impl StatefulText {
+    /// Creates a default stateful text from some String.
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `text`: The text to display.
+    ///
+    /// returns: `StatefulText`
     pub fn default(text: String) -> Self {
         Self {
             text,
@@ -194,6 +209,14 @@ impl StatefulText {
         }
     }
 
+    /// Creates a new `StatefulText` from some String and a `TextState`.
+    ///
+    /// # Arguments
+    ///
+    /// * `text`: The text to display.
+    /// * `state`: The state of the text.
+    ///
+    /// returns: `StatefulText`
     pub fn new(text: String, state: TextState) -> Self {
         Self {
             text,
@@ -205,6 +228,11 @@ impl StatefulText {
         }
     }
 
+    /// Adds the text to the UI.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui`: The UI to add the text to.
     pub fn show(&self, ui: &mut Ui) {
         let color = match self.state {
             TextState::Success => self.success_color,
@@ -215,14 +243,29 @@ impl StatefulText {
         ui.colored_label(color, &self.text);
     }
 
+    /// Sets the color for the success state.
+    ///
+    /// # Arguments
+    ///
+    /// * `success_color`: The color to use for success.
     pub fn set_success(&mut self, success_color: Color32) {
         self.success_color = success_color;
     }
 
+    /// Sets the color for the error state
+    ///
+    /// # Arguments
+    ///
+    /// * `error_color`: The color to use for error.
     pub fn set_error(&mut self, error_color: Color32) {
         self.error_color = error_color;
     }
 
+    /// Sets the color for the warning state
+    ///
+    /// # Arguments
+    ///
+    /// * `warning_color`: The color to use for warning.
     pub fn set_warning(&mut self, warning_color: Color32) {
         self.warning_color = warning_color;
     }
