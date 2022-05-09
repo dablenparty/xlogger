@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::time::SystemTime;
 
+use eframe::egui::Ui;
+use eframe::epaint::Color32;
 use gilrs::{Axis, Gilrs};
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
@@ -58,9 +60,9 @@ pub fn open_dialog_in_data_folder() -> Option<PathBuf> {
 /// # Arguments
 ///
 /// * `should_run`: Thread-safe boolean value that determines whether the event loop should continue
-/// 
+///
 /// # Errors
-/// 
+///
 /// This function will error if something goes wrong creating the CSV files or writing to them.
 ///
 /// returns: ()
@@ -160,4 +162,68 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+#[derive(Debug)]
+pub enum TextState {
+    Success,
+    Error,
+    Warning,
+    Default,
+}
+
+#[derive(Debug)]
+pub struct StatefulText {
+    pub text: String,
+    pub state: TextState,
+    success_color: Color32,
+    error_color: Color32,
+    warning_color: Color32,
+    default_color: Color32,
+}
+
+impl StatefulText {
+    pub fn default(text: String) -> Self {
+        Self {
+            text,
+            state: TextState::Default,
+            success_color: Color32::GREEN,
+            error_color: Color32::RED,
+            warning_color: Color32::YELLOW,
+            default_color: Color32::WHITE,
+        }
+    }
+
+    pub fn new(text: String, state: TextState) -> Self {
+        Self {
+            text,
+            state,
+            success_color: Color32::GREEN,
+            error_color: Color32::RED,
+            warning_color: Color32::YELLOW,
+            default_color: Color32::GRAY,
+        }
+    }
+
+    pub fn show(&self, ui: &mut Ui) {
+        let color = match self.state {
+            TextState::Success => self.success_color,
+            TextState::Error => self.error_color,
+            TextState::Warning => self.warning_color,
+            TextState::Default => self.default_color,
+        };
+        ui.colored_label(color, &self.text);
+    }
+
+    pub fn set_success(&mut self, success_color: Color32) {
+        self.success_color = success_color;
+    }
+
+    pub fn set_error(&mut self, error_color: Color32) {
+        self.error_color = error_color;
+    }
+
+    pub fn set_warning(&mut self, warning_color: Color32) {
+        self.warning_color = warning_color;
+    }
 }
