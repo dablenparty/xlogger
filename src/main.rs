@@ -139,11 +139,13 @@ impl XloggerApp {
         let forward_offset = 200;
 
         let ls_sliced = &ls_events[self.slider_timestamp as usize
-            ..(self.slider_timestamp as usize + forward_offset).min(ls_events.len())];
+            ..((self.slider_timestamp as usize).saturating_add(forward_offset))
+                .min(ls_events.len())];
         let ls_values = Values::from_values(ls_sliced.to_vec());
 
         let rs_sliced = &rs_events[self.slider_timestamp as usize
-            ..(self.slider_timestamp as usize + forward_offset).min(rs_events.len())];
+            ..((self.slider_timestamp as usize).saturating_add(forward_offset))
+                .min(rs_events.len())];
         // this moves the points to the right so that this data is not on top of the previous data
         let translated_vec = rs_sliced
             .iter()
@@ -153,7 +155,9 @@ impl XloggerApp {
         ui.horizontal(|ui| {
             ui.add(egui::Slider::new(
                 &mut self.slider_timestamp,
-                0..=(ls_events.len() - forward_offset).try_into().unwrap(),
+                0..=(ls_events.len().saturating_sub(forward_offset))
+                    .try_into()
+                    .unwrap(),
             ));
             ui.checkbox(&mut self.show_stick_lines, "Show lines");
         });
