@@ -1,16 +1,16 @@
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{io, thread};
 
 use eframe::egui::plot::{Plot, Points, Value, Values};
-use eframe::egui::{self, Ui, Window};
+use eframe::egui::{self, Ui};
 use human_panic::setup_panic;
 use log::{debug, error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
-use xlogger::{BoxedResult, ControllerStickEvent};
+use xlogger::{open_dialog_in_data_folder, BoxedResult, ControllerStickEvent};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -57,19 +57,13 @@ impl eframe::App for XloggerApp {
                 if ui.button("Visualize Sticks").clicked() {
                     // opens to the data folder
                     // if it doesn't exist, RFD defaults to the Documents folder
-                    if let Some(path) = rfd::FileDialog::new()
-                        .set_directory(get_exe_parent_dir().join("data"))
-                        .pick_file()
-                    {
+                    if let Some(path) = open_dialog_in_data_folder() {
                         self.show_stick_window = true;
                         self.visualize_path = Some(path);
                     }
                 };
                 if ui.button("Visualize Buttons").clicked() {
-                    if let Some(path) = rfd::FileDialog::new()
-                        .set_directory(get_exe_parent_dir().join("data"))
-                        .pick_file()
-                    {
+                    if let Some(path) = open_dialog_in_data_folder() {
                         thread::spawn(move || match Self::visualize_button_data(path) {
                             Ok(exit_status) => {
                                 info!("Visualization exited with status {}", exit_status)

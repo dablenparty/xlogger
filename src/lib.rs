@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::io;
+use std::path::PathBuf;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::time::SystemTime;
 
 use gilrs::{Axis, Gilrs};
 use log::{error, warn};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -35,6 +36,19 @@ pub struct ControllerStickEvent {
 struct ControllerStickState {
     x: f32,
     y: f32,
+}
+
+/// Opens a file dialog to the applications data folder.
+/// If the folder doesn't exist, it defaults to the Documents folder.
+///
+/// If a file is selected, it returns the path to the file. Otherwise,
+/// it returns None.
+///
+/// returns: `Option<PathBuf>`
+pub fn open_dialog_in_data_folder() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_directory(get_exe_parent_dir().join("data"))
+        .pick_file()
 }
 
 /// Starts an event loop that listens for controller events and writes them to a file.
