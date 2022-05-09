@@ -115,7 +115,7 @@ impl XloggerApp {
     }
 
     fn visualize_stick_data(&mut self, ui: &mut Ui) -> io::Result<Option<egui::Response>> {
-        if let None = self.visualize_path {
+        if self.visualize_path.is_none() {
             return Ok(None);
         }
         // at this point, we know it's not None
