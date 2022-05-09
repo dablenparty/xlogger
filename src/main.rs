@@ -135,7 +135,7 @@ impl XloggerApp {
                 acc.1.push(Value::new(element.right_x, element.right_y));
                 (acc.0, acc.1)
             });
-        //? maybe add a slider for this offset (and a warning about performance)
+        // TODO maybe add a slider for this offset (and a warning about performance)
         let forward_offset = 200;
 
         let ls_sliced = &ls_events[self.slider_timestamp as usize
@@ -164,7 +164,6 @@ impl XloggerApp {
                 ui.label("Warning: too much data to visualize! not all of it will be shown");
             }
         });
-        // TODO: add a line toggle
         Ok(Some(
             Plot::new("Stick Data")
                 .data_aspect(1.0)
