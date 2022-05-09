@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{io, thread};
 
-use eframe::egui::plot::{Legend, Plot, Points, Value, Values};
+use eframe::egui::plot::{Legend, Line, Plot, Points, Value, Values};
 use eframe::egui::{self, Ui};
 use human_panic::setup_panic;
 use log::{debug, error, info, warn, LevelFilter};
@@ -23,6 +23,7 @@ struct XloggerApp {
     show_stick_window: bool,
     visualize_path: Option<PathBuf>,
     slider_timestamp: u64,
+    show_stick_lines: bool,
 }
 
 impl eframe::App for XloggerApp {
@@ -134,13 +135,12 @@ impl XloggerApp {
                 acc.1.push(Value::new(element.right_x, element.right_y));
                 (acc.0, acc.1)
             });
-        // TODO: add a slider for this offset (and a warning about performance)
+        //? maybe add a slider for this offset (and a warning about performance)
         let forward_offset = 200;
-        let point_radius = 1.0;
 
         let ls_sliced = &ls_events[self.slider_timestamp as usize
             ..(self.slider_timestamp as usize + forward_offset).min(ls_events.len())];
-        let ls_points = Points::new(Values::from_values(ls_sliced.to_vec())).radius(point_radius);
+        let ls_values = Values::from_values(ls_sliced.to_vec());
 
         let rs_sliced = &rs_events[self.slider_timestamp as usize
             ..(self.slider_timestamp as usize + forward_offset).min(rs_events.len())];
@@ -149,19 +149,37 @@ impl XloggerApp {
             .iter()
             .map(|element| Value::new(element.x + 2.5, element.y))
             .collect::<Vec<Value>>();
-        let rs_points = Points::new(Values::from_values(translated_vec)).radius(point_radius);
-        ui.add(egui::Slider::new(
-            &mut self.slider_timestamp,
-            0..=(ls_events.len() - forward_offset).try_into().unwrap(),
-        ));
+        let rs_values = Values::from_values(translated_vec);
+        ui.horizontal(|ui| {
+            ui.add(egui::Slider::new(
+                &mut self.slider_timestamp,
+                0..=(ls_events.len() - forward_offset).try_into().unwrap(),
+            ));
+            ui.checkbox(&mut self.show_stick_lines, "Show lines");
+        });
         // TODO: add a line toggle
         Ok(Some(
             Plot::new("Stick Data")
                 .data_aspect(1.0)
                 .legend(Legend::default())
                 .show(ui, |plot_ui| {
-                    plot_ui.points(ls_points.name("Left Stick"));
-                    plot_ui.points(rs_points.name("Right Stick"));
+                    let point_radius = 1.0;
+
+                    if self.show_stick_lines {
+                        plot_ui.line(Line::new(ls_values).name("Left Stick"));
+                        plot_ui.line(Line::new(rs_values).name("Right Stick"));
+                    } else {
+                        plot_ui.points(
+                            Points::new(ls_values)
+                                .radius(point_radius)
+                                .name("Left Stick"),
+                        );
+                        plot_ui.points(
+                            Points::new(rs_values)
+                                .radius(point_radius)
+                                .name("Right Stick"),
+                        );
+                    }
                 })
                 .response,
         ))
