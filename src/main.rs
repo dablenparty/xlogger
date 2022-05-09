@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{io, thread};
 
-use eframe::egui::plot::{Legend, Line, Plot, Points, Value, Values};
+use eframe::egui::plot::{Legend, Plot, Points, Value, Values};
 use eframe::egui::{self, Ui};
 use human_panic::setup_panic;
 use log::{debug, error, info, warn, LevelFilter};
@@ -120,7 +120,7 @@ impl XloggerApp {
         }
         // at this point, we know it's not None
         let path = self.visualize_path.as_ref().unwrap();
-        let events: Vec<_> = csv::Reader::from_path(path)?
+        let (ls_events, rs_events) = csv::Reader::from_path(path)?
             .deserialize::<ControllerStickEvent>()
             .filter_map(|result| match result {
                 Ok(event) => Some(event),
@@ -129,24 +129,39 @@ impl XloggerApp {
                     None
                 }
             })
-            .map(|event| Value::new(event.left_x, event.left_y))
-            .collect();
+            .fold((Vec::new(), Vec::new()), |mut acc, element| {
+                acc.0.push(Value::new(element.left_x, element.left_y));
+                acc.1.push(Value::new(element.right_x, element.right_y));
+                (acc.0, acc.1)
+            });
         // TODO: add a slider for this offset (and a warning about performance)
         let forward_offset = 200;
+        let point_radius = 1.0;
+
+        let ls_sliced = &ls_events[self.slider_timestamp as usize
+            ..(self.slider_timestamp as usize + forward_offset).min(ls_events.len())];
+        let ls_points = Points::new(Values::from_values(ls_sliced.to_vec())).radius(point_radius);
+
+        let rs_sliced = &rs_events[self.slider_timestamp as usize
+            ..(self.slider_timestamp as usize + forward_offset).min(rs_events.len())];
+        // this moves the points to the right so that this data is not on top of the previous data
+        let translated_vec = rs_sliced
+            .iter()
+            .map(|element| Value::new(element.x + 2.5, element.y))
+            .collect::<Vec<Value>>();
+        let rs_points = Points::new(Values::from_values(translated_vec)).radius(point_radius);
         ui.add(egui::Slider::new(
             &mut self.slider_timestamp,
-            0..=((events.len() as u64) - forward_offset),
+            0..=(ls_events.len() - forward_offset).try_into().unwrap(),
         ));
-        // take min of the timestamp + 100 and the length of the events
-        let sliced = &events[self.slider_timestamp as usize
-            ..(self.slider_timestamp as usize + forward_offset).min(events.len())];
-        let points = Points::new(Values::from_values(sliced.to_vec())).radius(0.5);
+        // TODO: add a line toggle
         Ok(Some(
             Plot::new("Stick Data")
                 .data_aspect(1.0)
                 .legend(Legend::default())
                 .show(ui, |plot_ui| {
-                    plot_ui.points(points.name("Left Stick"));
+                    plot_ui.points(ls_points.name("Left Stick"));
+                    plot_ui.points(rs_points.name("Right Stick"));
                 })
                 .response,
         ))
