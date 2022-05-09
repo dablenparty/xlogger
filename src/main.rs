@@ -160,6 +160,9 @@ impl XloggerApp {
                     .unwrap(),
             ));
             ui.checkbox(&mut self.show_stick_lines, "Show lines");
+            if ls_events.len() == usize::MAX {
+                ui.label("Warning: too much data to visualize! not all of it will be shown");
+            }
         });
         // TODO: add a line toggle
         Ok(Some(
