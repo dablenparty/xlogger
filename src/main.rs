@@ -11,7 +11,9 @@ use eframe::egui::{self, Ui};
 use human_panic::setup_panic;
 use log::{debug, error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
-use xlogger::{open_dialog_in_data_folder, BoxedResult, ControllerStickEvent};
+use xlogger::{
+    open_dialog_in_data_folder, BoxedResult, ControllerStickEvent, StatefulText, TextState,
+};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -20,7 +22,7 @@ mod util;
 #[derive(Default)]
 struct XloggerApp {
     should_run: Arc<AtomicBool>,
-    saved_text: String,
+    saved_text: StatefulText,
     show_stick_window: bool,
     visualize_path: Option<PathBuf>,
     slider_timestamp: u64,
@@ -49,11 +51,11 @@ impl eframe::App for XloggerApp {
                         };
                         ("started listening to controllers", "".to_owned())
                     };
-                    self.saved_text = saved_text;
+                    self.saved_text.text = saved_text;
                     info!("{}", log_message);
                     self.should_run.store(!should_run_value, Ordering::Relaxed);
                 }
-                ui.label(&self.saved_text);
+                self.saved_text.show(ui);
             });
             ui.horizontal(|ui| {
                 if ui.button("Visualize Sticks").clicked() {
