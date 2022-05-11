@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::{io, thread};
 
 use eframe::egui::plot::{Legend, Line, Plot, Points, Value, Values};
-use eframe::egui::{self, Ui};
+use eframe::egui::{self, Slider, Ui};
 use human_panic::setup_panic;
 use log::{debug, error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
@@ -32,6 +32,7 @@ struct XloggerApp {
     visualize_path: Option<PathBuf>,
     slider_timestamp: u64,
     show_stick_lines: bool,
+    stick_data_offset: u8,
 }
 
 impl eframe::App for XloggerApp {
@@ -175,14 +176,13 @@ impl XloggerApp {
             self.stick_csv_data = Some(data.clone());
             (data.left_values, data.right_values)
         };
-        // TODO maybe add a slider for this offset (and a warning about performance)
-        let offset = 200;
-
-        let ls_sliced = &ls_events[(self.slider_timestamp as usize).saturating_sub(offset)
+        let ls_sliced = &ls_events[(self.slider_timestamp as usize)
+            .saturating_sub(self.stick_data_offset.into())
             ..self.slider_timestamp as usize];
         let ls_values = Values::from_values(ls_sliced.to_vec());
 
-        let rs_sliced = &rs_events[(self.slider_timestamp as usize).saturating_sub(offset)
+        let rs_sliced = &rs_events[(self.slider_timestamp as usize)
+            .saturating_sub(self.stick_data_offset.into())
             ..self.slider_timestamp as usize];
         // this moves the points to the right so that this data is not on top of the previous data
         let translated_vec = rs_sliced
@@ -192,7 +192,7 @@ impl XloggerApp {
         let rs_values = Values::from_values(translated_vec);
         ui.horizontal(|ui| {
             // usize should always convert to u64
-            ui.add(egui::Slider::new(
+            ui.add(Slider::new(
                 &mut self.slider_timestamp,
                 0..=ls_events.len().try_into().unwrap(),
             ));
@@ -200,6 +200,8 @@ impl XloggerApp {
             if ls_events.len() == usize::MAX {
                 ui.label("Warning: too much data to visualize! not all of it will be shown");
             }
+            ui.add(Slider::new(&mut self.stick_data_offset, u8::MIN..=u8::MAX))
+                .on_hover_text("Higher values may cause performance issues");
         });
         Ok(Some(
             Plot::new("Stick Data")
@@ -248,6 +250,7 @@ fn main() {
 
     let app = XloggerApp {
         should_run,
+        stick_data_offset: 50,
         ..XloggerApp::default()
     };
     let native_options = eframe::NativeOptions::default();
