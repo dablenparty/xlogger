@@ -30,7 +30,7 @@ struct XloggerApp {
     show_stick_window: bool,
     stick_csv_data: Option<ControllerCsvData>,
     visualize_path: Option<PathBuf>,
-    slider_timestamp: u64,
+    slider_timestamp: usize,
     show_stick_lines: bool,
     stick_data_offset: u8,
 }
@@ -176,14 +176,16 @@ impl XloggerApp {
             self.stick_csv_data = Some(data.clone());
             (data.left_values, data.right_values)
         };
-        let ls_sliced = &ls_events[(self.slider_timestamp as usize)
+        let ls_sliced = &ls_events[self
+            .slider_timestamp
             .saturating_sub(self.stick_data_offset.into())
-            ..self.slider_timestamp as usize];
+            ..self.slider_timestamp];
         let ls_values = Values::from_values(ls_sliced.to_vec());
 
-        let rs_sliced = &rs_events[(self.slider_timestamp as usize)
+        let rs_sliced = &rs_events[self
+            .slider_timestamp
             .saturating_sub(self.stick_data_offset.into())
-            ..self.slider_timestamp as usize];
+            ..self.slider_timestamp];
         // this moves the points to the right so that this data is not on top of the previous data
         let translated_vec = rs_sliced
             .iter()
@@ -195,7 +197,7 @@ impl XloggerApp {
             // usize should always convert to u64
             ui.add(Slider::new(
                 &mut self.slider_timestamp,
-                0..=ls_events.len().try_into().unwrap(),
+                0..=ls_events.len(),
             ));
             ui.checkbox(&mut self.show_stick_lines, "Show lines");
             if ls_events.len() == usize::MAX {
