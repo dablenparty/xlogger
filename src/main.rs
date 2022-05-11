@@ -11,19 +11,24 @@ use eframe::egui::{self, Ui};
 use human_panic::setup_panic;
 use log::{debug, error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
-use xlogger::{
-    open_dialog_in_data_folder, BoxedResult, ControllerStickEvent, StatefulText, TextState,
-};
+use xlogger::{open_dialog_in_data_folder, BoxedResult, ControllerStickEvent, StatefulText};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
 mod util;
+
+#[derive(Clone)]
+struct ControllerCsvData {
+    left_values: Vec<Value>,
+    right_values: Vec<Value>,
+}
 
 #[derive(Default)]
 struct XloggerApp {
     should_run: Arc<AtomicBool>,
     saved_text: StatefulText,
     show_stick_window: bool,
+    stick_csv_data: Option<ControllerCsvData>,
     visualize_path: Option<PathBuf>,
     slider_timestamp: u64,
     show_stick_lines: bool,
@@ -63,6 +68,7 @@ impl eframe::App for XloggerApp {
                     // if it doesn't exist, RFD defaults to the Documents folder
                     if let Some(path) = open_dialog_in_data_folder() {
                         self.show_stick_window = true;
+                        self.stick_csv_data = None;
                         self.visualize_path = Some(path);
                     }
                 };
@@ -85,6 +91,7 @@ impl eframe::App for XloggerApp {
                 );
                 error!("{}", e);
                 self.visualize_path = None;
+                self.stick_csv_data = None;
                 self.show_stick_window = false;
             }
         });
@@ -145,17 +152,29 @@ impl XloggerApp {
         }
         // at this point, we know it's not None
         let path = self.visualize_path.as_ref().unwrap();
-        let (ls_events, rs_events) = csv::Reader::from_path(path)?
-            .deserialize::<ControllerStickEvent>()
-            .try_fold::<_, _, Result<(Vec<Value>, Vec<Value>), Box<dyn Error>>>(
-                (Vec::new(), Vec::new()),
-                |mut acc, result| {
-                    let event = result?;
-                    acc.0.push(Value::new(event.left_x, event.left_y));
-                    acc.1.push(Value::new(event.right_x, event.right_y));
-                    Ok((acc.0, acc.1))
-                },
-            )?;
+        // try to get the cached CSV data. if it doesn't exist, read it from the file
+        let (ls_events, rs_events) = if let Some(data) = &self.stick_csv_data {
+            let data = data.clone();
+            (data.left_values, data.right_values)
+        } else {
+            let (left_values, right_values) = csv::Reader::from_path(path)?
+                .deserialize::<ControllerStickEvent>()
+                .try_fold::<_, _, Result<(Vec<Value>, Vec<Value>), Box<dyn Error>>>(
+                    (Vec::new(), Vec::new()),
+                    |mut acc, result| {
+                        let event = result?;
+                        acc.0.push(Value::new(event.left_x, event.left_y));
+                        acc.1.push(Value::new(event.right_x, event.right_y));
+                        Ok((acc.0, acc.1))
+                    },
+                )?;
+            let data = ControllerCsvData {
+                left_values,
+                right_values,
+            };
+            self.stick_csv_data = Some(data.clone());
+            (data.left_values, data.right_values)
+        };
         // TODO maybe add a slider for this offset (and a warning about performance)
         let forward_offset = 200;
 
