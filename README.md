@@ -2,30 +2,33 @@
 
 The keylogger for controllers
 
+## Installation
+
+- Download the latest release zip file
+- Extract it wherever you want (I highly recommend extracting to its own folder)
+- Create a shortcut for `xlogger.exe` and put it wherever (optional)
+- Run it
+
 ## Usage
 
-For now, this is a command line program (a.k.a. CLI). Unzip it wherever you want, open PowerShell in that folder, and run `xlogger.exe`. Just use `Ctrl-C` to stop the program.
-
-There is also a `visualize` script which is compiled from Python (yes, you read that right). When the main program receives a `Ctrl-C`, it will auto-launch the script using the data from the current session.
+This is a GUI program can be run like any other; however, the executable (a.k.a. the `xlogger.exe` file) MUST stay in the same folder as the `visualize` folder it comes with.
 
 ## Features
 
 ### Current
 
-At the time of writing, the program is capable of logging button and stick events from a single controller. It _cannot_ differentiate between multiple controllers.
+At the time of writing, the program is capable of logging button and stick events from a single controller. It can visualize both stick and button data. It _cannot_ differentiate between multiple controllers, nor does it currently support anything other than XInput (hence the name xlogger).
 
 ### Planned
 
 Currently planned features are:
 
-- A GUI to make it easier to use the program
-- Visualization of the stick data
-  - Most likely will draw all the points on a cartesian plane (ignoring the time) and provide some kind of way to "scrub" through the time data, updating a special point on the cartesian plane that shows the current time
-- Static site generation
-  - This may seem strange at first. Instead of relying on Plotly to generate the graphs on-the-fly every time, I want to generate them _once_ after each session as a static site. This means that each session can be viewed independently without having to regenerate the graphs every time.
-- Better visualizations of the data (most likely through a different library entirely)
-  - Chart.js is promising, as is D3
 - Multiple controller support
+  - Connecting and logging multiple controllers at once
+- Wider controller support
+  - Expanding support to controllers that don't use XInput (e.g., PS4/5 controllers)
+- "In-house" button data visualization
+  - Currently, the button data is created
 
 ## Build instructions
 
