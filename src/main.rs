@@ -162,6 +162,7 @@ impl XloggerApp {
             let data = data.clone();
             (data.left_values, data.right_values)
         } else {
+            info!("reading stick data from {}", path.display());
             let (left_values, right_values) = csv::Reader::from_path(path)?
                 .deserialize::<ControllerStickEvent>()
                 .try_fold::<_, _, Result<(Vec<Value>, Vec<Value>), Box<dyn Error>>>(
