@@ -195,10 +195,7 @@ impl XloggerApp {
         ui.horizontal(|ui| {
             ui.label("Time");
             // usize should always convert to u64
-            ui.add(Slider::new(
-                &mut self.slider_timestamp,
-                0..=ls_events.len(),
-            ));
+            ui.add(Slider::new(&mut self.slider_timestamp, 0..=ls_events.len()));
             ui.checkbox(&mut self.show_stick_lines, "Show lines");
             if ls_events.len() == usize::MAX {
                 ui.label("Warning: too much data to visualize! not all of it will be shown");
@@ -237,6 +234,27 @@ impl XloggerApp {
     }
 }
 
+/// Initializes the logging library
+///
+/// The current implementation outputs `warn` and above to the console and `debug` and above to
+/// a file.
+fn init_logger() -> BoxedResult<()> {
+    let mut file_path = get_exe_parent_dir();
+    let filename = chrono::Local::now()
+        .naive_local()
+        .format("%Y-%m-%d %H-%M-%S.log")
+        .to_string();
+    file_path.push("logs");
+    create_dir_if_not_exists(&file_path)?;
+    file_path.push(filename);
+    WriteLogger::init(
+        LevelFilter::Info,
+        Config::default(),
+        File::create(&file_path)?,
+    )?;
+    Ok(())
+}
+
 fn main() {
     // traditionally, this is used for CLI's
     // in the case that this GUI does crash, this
@@ -268,25 +286,4 @@ fn main() {
             Box::new(app)
         }),
     );
-}
-
-/// Initializes the logging library
-///
-/// The current implementation outputs `warn` and above to the console and `debug` and above to
-/// a file.
-fn init_logger() -> BoxedResult<()> {
-    let mut file_path = get_exe_parent_dir();
-    let filename = chrono::Local::now()
-        .naive_local()
-        .format("%Y-%m-%d %H-%M-%S.log")
-        .to_string();
-    file_path.push("logs");
-    create_dir_if_not_exists(&file_path)?;
-    file_path.push(filename);
-    WriteLogger::init(
-        LevelFilter::Info,
-        Config::default(),
-        File::create(&file_path)?,
-    )?;
-    Ok(())
 }
