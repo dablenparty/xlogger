@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 use std::io;
+use std::path::PathBuf;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::time::SystemTime;
 
+use eframe::egui::Ui;
+use eframe::epaint::Color32;
 use gilrs::{Axis, Gilrs};
 use log::{error, warn};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -21,20 +24,33 @@ struct ControllerButtonEvent {
     button: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-struct ControllerStickEvent {
-    time: f64,
-    left_x: f32,
-    left_y: f32,
-    right_x: f32,
-    right_y: f32,
+pub struct ControllerStickEvent {
+    pub time: f64,
+    pub left_x: f32,
+    pub left_y: f32,
+    pub right_x: f32,
+    pub right_y: f32,
 }
 
 #[derive(Debug, Default)]
 struct ControllerStickState {
     x: f32,
     y: f32,
+}
+
+/// Opens a file dialog to the applications data folder.
+/// If the folder doesn't exist, it defaults to the Documents folder.
+///
+/// If a file is selected, it returns the path to the file. Otherwise,
+/// it returns None.
+///
+/// returns: `Option<PathBuf>`
+pub fn open_dialog_in_data_folder() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_directory(get_exe_parent_dir().join("data"))
+        .pick_file()
 }
 
 /// Starts an event loop that listens for controller events and writes them to a file.
@@ -44,6 +60,10 @@ struct ControllerStickState {
 /// # Arguments
 ///
 /// * `should_run`: Thread-safe boolean value that determines whether the event loop should continue
+///
+/// # Errors
+///
+/// This function will error if something goes wrong creating the CSV files or writing to them.
 ///
 /// returns: ()
 pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
@@ -142,4 +162,78 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+#[derive(Debug)]
+pub enum TextState {
+    Success,
+    Error,
+    Warning,
+    Default,
+}
+
+/// Text that has a state associated with it.
+///
+/// By default, the colors are as follows:
+///
+/// * Success: green
+/// * Error: red
+/// * Warning: yellow
+#[derive(Debug)]
+pub struct StatefulText {
+    pub text: String,
+    pub state: TextState,
+    success_color: Color32,
+    error_color: Color32,
+    warning_color: Color32,
+    default_color: Color32,
+}
+
+impl Default for StatefulText {
+    fn default() -> Self {
+        Self {
+            text: String::default(),
+            state: TextState::Default,
+            success_color: Color32::GREEN,
+            error_color: Color32::RED,
+            warning_color: Color32::YELLOW,
+            default_color: Color32::WHITE,
+        }
+    }
+}
+
+impl StatefulText {
+    /// Creates a new `StatefulText` from some String and a `TextState`.
+    ///
+    /// # Arguments
+    ///
+    /// * `text`: The text to display.
+    /// * `state`: The state of the text.
+    ///
+    /// returns: `StatefulText`
+    pub fn new(text: String, state: TextState) -> Self {
+        Self {
+            text,
+            state,
+            success_color: Color32::GREEN,
+            error_color: Color32::RED,
+            warning_color: Color32::YELLOW,
+            default_color: Color32::GRAY,
+        }
+    }
+
+    /// Adds the text to the UI.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui`: The UI to add the text to.
+    pub fn show(&self, ui: &mut Ui) {
+        let color = match self.state {
+            TextState::Success => self.success_color,
+            TextState::Error => self.error_color,
+            TextState::Warning => self.warning_color,
+            TextState::Default => self.default_color,
+        };
+        ui.colored_label(color, &self.text);
+    }
 }
