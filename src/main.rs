@@ -183,6 +183,9 @@ impl XloggerApp {
             self.stick_csv_data = Some(data.clone());
             (data.left_values, data.right_values)
         };
+
+        // slice the data for the selected range
+        // e.g., if the offset is 10 and the timestamp is 15, we'll slice the data from 5 to 15
         let ls_sliced = &ls_events[self
             .slider_timestamp
             .saturating_sub(self.stick_data_offset.into())
