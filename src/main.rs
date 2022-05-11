@@ -8,7 +8,9 @@ use std::{io, thread};
 
 use eframe::egui::plot::{Legend, Line, Plot, Points, Value, Values};
 use eframe::egui::{self, Slider, Ui};
+use eframe::IconData;
 use human_panic::setup_panic;
+use image::ImageResult;
 use log::{debug, error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::{open_dialog_in_data_folder, BoxedResult, ControllerStickEvent, StatefulText};
@@ -255,6 +257,18 @@ fn init_logger() -> BoxedResult<()> {
     Ok(())
 }
 
+fn get_icon_data() -> ImageResult<IconData> {
+    let path = concat!(env!("OUT_DIR"), "/icon.ico");
+    let icon = image::open(path)?.to_rgba8();
+    let (width, height) = icon.dimensions();
+
+    Ok(IconData {
+        width,
+        height,
+        rgba: icon.into_raw(),
+    })
+}
+
 fn main() {
     // traditionally, this is used for CLI's
     // in the case that this GUI does crash, this
@@ -277,7 +291,17 @@ fn main() {
         stick_data_offset: 50,
         ..XloggerApp::default()
     };
-    let native_options = eframe::NativeOptions::default();
+    let native_options = match get_icon_data() {
+        Ok(icon_data) => eframe::NativeOptions {
+            icon_data: Some(icon_data),
+            ..eframe::NativeOptions::default()
+        },
+
+        Err(e) => {
+            error!("Failed to load icon with error: {}", e);
+            eframe::NativeOptions::default()
+        }
+    };
     eframe::run_native(
         "xlogger",
         native_options,
