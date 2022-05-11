@@ -191,6 +191,7 @@ impl XloggerApp {
             .collect::<Vec<Value>>();
         let rs_values = Values::from_values(translated_vec);
         ui.horizontal(|ui| {
+            ui.label("Time");
             // usize should always convert to u64
             ui.add(Slider::new(
                 &mut self.slider_timestamp,
@@ -200,6 +201,9 @@ impl XloggerApp {
             if ls_events.len() == usize::MAX {
                 ui.label("Warning: too much data to visualize! not all of it will be shown");
             }
+        });
+        ui.horizontal(|ui| {
+            ui.label("Number of points displayed");
             ui.add(Slider::new(&mut self.stick_data_offset, u8::MIN..=u8::MAX))
                 .on_hover_text("Higher values may cause performance issues");
         });
