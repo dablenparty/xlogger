@@ -176,16 +176,14 @@ impl XloggerApp {
             (data.left_values, data.right_values)
         };
         // TODO maybe add a slider for this offset (and a warning about performance)
-        let forward_offset = 200;
+        let offset = 200;
 
-        let ls_sliced = &ls_events[self.slider_timestamp as usize
-            ..((self.slider_timestamp as usize).saturating_add(forward_offset))
-                .min(ls_events.len())];
+        let ls_sliced = &ls_events[(self.slider_timestamp as usize).saturating_sub(offset)
+            ..self.slider_timestamp as usize];
         let ls_values = Values::from_values(ls_sliced.to_vec());
 
-        let rs_sliced = &rs_events[self.slider_timestamp as usize
-            ..((self.slider_timestamp as usize).saturating_add(forward_offset))
-                .min(rs_events.len())];
+        let rs_sliced = &rs_events[(self.slider_timestamp as usize).saturating_sub(offset)
+            ..self.slider_timestamp as usize];
         // this moves the points to the right so that this data is not on top of the previous data
         let translated_vec = rs_sliced
             .iter()
@@ -193,11 +191,10 @@ impl XloggerApp {
             .collect::<Vec<Value>>();
         let rs_values = Values::from_values(translated_vec);
         ui.horizontal(|ui| {
+            // usize should always convert to u64
             ui.add(egui::Slider::new(
                 &mut self.slider_timestamp,
-                0..=(ls_events.len().saturating_sub(forward_offset))
-                    .try_into()
-                    .unwrap(),
+                0..=ls_events.len().try_into().unwrap(),
             ));
             ui.checkbox(&mut self.show_stick_lines, "Show lines");
             if ls_events.len() == usize::MAX {
