@@ -265,6 +265,13 @@ fn init_logger() -> BoxedResult<()> {
     Ok(())
 }
 
+/// Loads the icon data
+///
+/// # Errors
+///
+/// This function errors if there is an issue reading the icon data from the file.
+///
+/// returns: `ImageResult<IconData>`
 fn get_icon_data() -> ImageResult<IconData> {
     let path = concat!(env!("OUT_DIR"), "/icon.ico");
     let icon = image::open(path)?.to_rgba8();
