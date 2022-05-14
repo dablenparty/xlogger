@@ -68,7 +68,7 @@ impl eframe::App for XloggerApp {
                 self.saved_text.show(ui);
             });
             ui.horizontal(|ui| {
-                //! TODO: find a way to display errors back to the user
+                // TODO: find a way to display errors back to the user
                 // TODO: add a button to show/hide the stick window
                 if ui.button("Visualize Sticks").clicked() {
                     // opens to the data folder
