@@ -22,7 +22,7 @@ use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 mod util;
 
 #[derive(Clone)]
-struct ControllerCsvData {
+struct ControllerStickData {
     left_values: Vec<Value>,
     right_values: Vec<Value>,
 }
@@ -32,7 +32,7 @@ struct XloggerApp {
     should_run: Arc<AtomicBool>,
     saved_text: StatefulText,
     show_stick_window: bool,
-    stick_csv_data: Option<ControllerCsvData>,
+    stick_csv_data: Option<ControllerStickData>,
     visualize_path: Option<PathBuf>,
     slider_timestamp: usize,
     show_stick_lines: bool,
@@ -176,7 +176,7 @@ impl XloggerApp {
                         Ok((acc.0, acc.1))
                     },
                 )?;
-            let data = ControllerCsvData {
+            let data = ControllerStickData {
                 left_values,
                 right_values,
             };
