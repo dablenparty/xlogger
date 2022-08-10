@@ -102,27 +102,43 @@ impl eframe::App for XloggerApp {
                     }
                 }
             });
-            // show sticks plot or handle error
-            if let Err(e) = self.visualize_stick_data(ui) {
-                error!(
-                    "Something went wrong deserializing data at {:#?}:",
-                    self.stick_graph_props.data_path,
-                );
-                error!("{}", e);
-                self.stick_graph_props.show_graph = false;
-                self.stick_graph_props.csv_data = None;
-                self.stick_graph_props.data_path = None;
+            // TODO: extract windows into their own impl structs
+            if self.stick_graph_props.show_graph {
+                let window = egui::Window::new("Stick Graph")
+                    .resizable(true)
+                    .collapsible(true)
+                    .title_bar(true);
+                window.show(ctx, |ui| {
+                    // show sticks plot or handle error
+                    if let Err(e) = self.visualize_stick_data(ui) {
+                        error!(
+                            "Something went wrong deserializing data at {:#?}:",
+                            self.stick_graph_props.data_path,
+                        );
+                        error!("{}", e);
+                        self.stick_graph_props.show_graph = false;
+                        self.stick_graph_props.csv_data = None;
+                        self.stick_graph_props.data_path = None;
+                    }
+                });
             }
-
-            if let Err(e) = self.visualize_button_data(ui) {
-                error!(
-                    "Something went wrong deserializing data at {:#?}:",
-                    self.button_graph_props.data_path,
-                );
-                error!("{}", e);
-                self.button_graph_props.show_graph = false;
-                self.button_graph_props.csv_data = None;
-                self.button_graph_props.data_path = None;
+            if self.button_graph_props.show_graph {
+                let window = egui::Window::new("Button Graph")
+                    .resizable(true)
+                    .collapsible(true)
+                    .title_bar(true);
+                window.show(ctx, |ui| {
+                    if let Err(e) = self.visualize_button_data(ui) {
+                        error!(
+                            "Something went wrong deserializing data at {:#?}:",
+                            self.button_graph_props.data_path,
+                        );
+                        error!("{}", e);
+                        self.button_graph_props.show_graph = false;
+                        self.button_graph_props.csv_data = None;
+                        self.button_graph_props.data_path = None;
+                    }
+                });
             }
         });
     }
