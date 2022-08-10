@@ -1,21 +1,23 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::error::Error;
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
-use std::process::ExitStatus;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{io, thread};
+use std::thread;
 
-use eframe::egui::plot::{Legend, Line, Plot, Points, Value, Values};
+use eframe::egui::plot::{BoxElem, BoxPlot, BoxSpread, Legend, Line, Plot, Points, Value, Values};
 use eframe::egui::{self, Slider, Ui};
 use eframe::IconData;
 use human_panic::setup_panic;
 use image::ImageResult;
-use log::{debug, error, info, LevelFilter};
+use log::{error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
-use xlogger::{open_dialog_in_data_folder, BoxedResult, ControllerStickEvent, StatefulText};
+use xlogger::{
+    open_dialog_in_data_folder, BoxedResult, ControllerButtonEvent, ControllerStickEvent,
+    StatefulText,
+};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -38,10 +40,18 @@ struct StickGraphProps {
 }
 
 #[derive(Default)]
+struct ButtonGraphProps {
+    csv_data: Option<HashMap<String, Vec<BoxElem>>>,
+    data_path: Option<PathBuf>,
+    show_graph: bool,
+}
+
+#[derive(Default)]
 struct XloggerApp {
     should_run: Arc<AtomicBool>,
     saved_text: StatefulText,
     stick_graph_props: StickGraphProps,
+    button_graph_props: ButtonGraphProps,
 }
 
 impl eframe::App for XloggerApp {
@@ -86,12 +96,9 @@ impl eframe::App for XloggerApp {
                 };
                 if ui.button("Visualize Buttons").clicked() {
                     if let Some(path) = open_dialog_in_data_folder() {
-                        thread::spawn(move || match Self::visualize_button_data(path) {
-                            Ok(exit_status) => {
-                                info!("Visualization exited with status {}", exit_status);
-                            }
-                            Err(e) => error!("{:?}", e),
-                        });
+                        self.button_graph_props.data_path = Some(path);
+                        self.button_graph_props.show_graph = true;
+                        self.button_graph_props.csv_data = None
                     }
                 }
             });
@@ -106,6 +113,17 @@ impl eframe::App for XloggerApp {
                 self.stick_graph_props.csv_data = None;
                 self.stick_graph_props.data_path = None;
             }
+
+            if let Err(e) = self.visualize_button_data(ui) {
+                error!(
+                    "Something went wrong deserializing data at {:#?}:",
+                    self.button_graph_props.data_path,
+                );
+                error!("{}", e);
+                self.button_graph_props.show_graph = false;
+                self.button_graph_props.csv_data = None;
+                self.button_graph_props.data_path = None;
+            }
         });
     }
 }
@@ -118,29 +136,70 @@ impl XloggerApp {
     /// * `path` - The path to the file to visualize.
     ///
     /// returns: `io::Result<ExitStatus>`
-    fn visualize_button_data(path: PathBuf) -> io::Result<ExitStatus> {
-        info!("visualizing data from {}", path.display());
-        let visualize_script = get_exe_parent_dir().join("visualize").join("visualize");
-        debug!("visualize script: {}", visualize_script.display());
-        let mut child_proc = std::process::Command::new(&visualize_script)
-            .arg(path)
-            .spawn()?;
-        let exit_status = child_proc.wait()?;
-        if exit_status.success() {
-            Ok(exit_status)
-        } else {
-            error!(
-                "Visualization script exited with non-zero status: {}",
-                exit_status
-            );
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!(
-                    "Visualization script exited with non-zero status: {:?}",
-                    exit_status
-                ),
-            ))
+    fn visualize_button_data(&mut self, ui: &mut Ui) -> BoxedResult<Option<egui::Response>> {
+        let button_graph_props = &mut self.button_graph_props;
+        if !button_graph_props.show_graph {
+            return Ok(None);
         }
+        let data_path = button_graph_props.data_path.as_ref().unwrap();
+        let data = if let Some(data) = button_graph_props.csv_data.as_ref() {
+            data.clone()
+        } else {
+            // this looks horrible because the data needs to be sorted by button, not timestamp
+            info!("loading button data from {}", data_path.display());
+            let data = csv::Reader::from_path(data_path)?
+                .deserialize::<ControllerButtonEvent>()
+                .try_fold::<_, _, BoxedResult<HashMap<String, Vec<BoxElem>>>>(
+                    HashMap::new(),
+                    |mut acc, result| {
+                        let event = result?;
+                        let box_elem = BoxElem::new(
+                            0.5,
+                            BoxSpread::new(
+                                event.press_time,
+                                event.press_time,
+                                event.press_time,
+                                event.release_time,
+                                event.release_time,
+                            ),
+                        );
+                        match acc.get_mut(&event.button) {
+                            Some(vec) => vec.push(box_elem),
+                            None => {
+                                acc.insert(event.button, vec![box_elem]);
+                            }
+                        }
+                        Ok(acc)
+                    },
+                )?;
+            self.button_graph_props.csv_data = Some(data.clone());
+            data
+        };
+        let box_plots: Vec<BoxPlot> = data
+            .iter()
+            .enumerate()
+            .map(|(i, (key, vec))| {
+                let mapped_boxes: Vec<BoxElem> = vec
+                    .to_vec()
+                    .into_iter()
+                    .map(|mut e| {
+                        e.argument = i as f64;
+                        e
+                    })
+                    .collect();
+                BoxPlot::new(mapped_boxes).name(key).horizontal()
+            })
+            .collect();
+        Ok(Some(
+            Plot::new("Button Presses")
+                .legend(Legend::default())
+                .show(ui, |plot_ui| {
+                    box_plots
+                        .into_iter()
+                        .for_each(|box_plot| plot_ui.box_plot(box_plot));
+                })
+                .response,
+        ))
     }
 
     /// Visualizes the stick data in the given file.
@@ -155,10 +214,7 @@ impl XloggerApp {
     /// or if there is an issue deserializing the data such as malformed, missing, or extra columns.
     ///
     /// returns: `Result<Option<egui::Response>, Box<dyn Error>>`
-    fn visualize_stick_data(
-        &mut self,
-        ui: &mut Ui,
-    ) -> Result<Option<egui::Response>, Box<dyn Error>> {
+    fn visualize_stick_data(&mut self, ui: &mut Ui) -> BoxedResult<Option<egui::Response>> {
         let stick_graph_props = &mut self.stick_graph_props;
         if stick_graph_props.data_path.is_none() {
             return Ok(None);
@@ -173,7 +229,7 @@ impl XloggerApp {
             info!("reading stick data from {}", path.display());
             let (left_values, right_values) = csv::Reader::from_path(path)?
                 .deserialize::<ControllerStickEvent>()
-                .try_fold::<_, _, Result<(Vec<Value>, Vec<Value>), Box<dyn Error>>>(
+                .try_fold::<_, _, BoxedResult<(Vec<Value>, Vec<Value>)>>(
                     (Vec::new(), Vec::new()),
                     |mut acc, result| {
                         let event = result?;
