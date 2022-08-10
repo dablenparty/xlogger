@@ -16,12 +16,12 @@ mod util;
 
 pub type BoxedResult<T> = Result<T, Box<dyn std::error::Error>>;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-struct ControllerButtonEvent {
-    press_time: f64,
-    release_time: f64,
-    button: String,
+pub struct ControllerButtonEvent {
+    pub press_time: f64,
+    pub release_time: f64,
+    pub button: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
