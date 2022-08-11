@@ -6,6 +6,7 @@ use eframe::egui::{
     ComboBox, Context, Ui, Window,
 };
 use log::info;
+use strum::IntoEnumIterator;
 
 use crate::{BoxedResult, ControllerButtonEvent, ControllerType, EguiView};
 
@@ -151,21 +152,13 @@ impl EguiView for ControllerButtonGraph {
             ComboBox::from_label("Controller Type")
                 .selected_text(format!("{:?}", self.controller_type))
                 .show_ui(ui, |combo_ui| {
-                    combo_ui.selectable_value(
-                        &mut self.controller_type,
-                        ControllerType::Default,
-                        "Default",
-                    );
-                    combo_ui.selectable_value(
-                        &mut self.controller_type,
-                        ControllerType::Xbox,
-                        "Xbox",
-                    );
-                    combo_ui.selectable_value(
-                        &mut self.controller_type,
-                        ControllerType::PlayStation,
-                        "PlayStation",
-                    );
+                    for controller_type in ControllerType::iter() {
+                        combo_ui.selectable_value(
+                            &mut self.controller_type,
+                            controller_type,
+                            format!("{:?}", controller_type),
+                        );
+                    }
                 });
         });
         Plot::new(self.plot_id.clone())
