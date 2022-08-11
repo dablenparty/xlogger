@@ -14,13 +14,26 @@ struct ControllerStickData {
     right_values: Vec<Value>,
 }
 
-#[derive(Default)]
 pub struct ControllerStickGraph {
     csv_data: Option<ControllerStickData>,
     data_offset: u8,
     data_path: Option<PathBuf>,
+    plot_id: String,
     show_lines: bool,
     slider_timestamp: usize,
+}
+
+impl Default for ControllerStickGraph {
+    fn default() -> Self {
+        Self {
+            csv_data: None,
+            data_offset: 50,
+            data_path: None,
+            plot_id: uuid::Uuid::new_v4().to_string(),
+            show_lines: true,
+            slider_timestamp: 0,
+        }
+    }
 }
 
 impl ControllerStickGraph {
@@ -64,7 +77,7 @@ impl ControllerStickGraph {
         let title = if let Some(path) = self.data_path.as_ref() {
             path.as_path()
                 .file_name()
-                .unwrap_or(OsStr::new("Stick Graph"))
+                .unwrap_or_else(|| OsStr::new("Stick Graph"))
                 .to_string_lossy()
                 .into_owned()
         } else {
@@ -124,7 +137,7 @@ impl ControllerStickGraph {
             ui.add(Slider::new(&mut self.data_offset, u8::MIN..=u8::MAX))
                 .on_hover_text("Higher values may affect performance");
         });
-        Plot::new("Stick Data")
+        Plot::new(self.plot_id.clone())
             .data_aspect(1.0)
             .legend(Legend::default())
             .show(ui, |plot_ui| {
@@ -144,7 +157,6 @@ impl ControllerStickGraph {
                             .name("Right Stick"),
                     );
                 }
-            })
-            .response;
+            });
     }
 }

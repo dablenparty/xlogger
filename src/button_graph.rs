@@ -8,10 +8,20 @@ use log::info;
 
 use crate::{BoxedResult, ControllerButtonEvent};
 
-#[derive(Default)]
 pub struct ControllerButtonGraph {
     csv_data: Option<HashMap<String, Vec<BoxElem>>>,
     data_path: Option<PathBuf>,
+    plot_id: String,
+}
+
+impl Default for ControllerButtonGraph {
+    fn default() -> Self {
+        Self {
+            csv_data: None,
+            data_path: None,
+            plot_id: uuid::Uuid::new_v4().to_string(),
+        }
+    }
 }
 
 impl ControllerButtonGraph {
@@ -51,7 +61,7 @@ impl ControllerButtonGraph {
         let title = if let Some(path) = self.data_path.as_ref() {
             path.as_path()
                 .file_name()
-                .unwrap_or(OsStr::new("Button Graph"))
+                .unwrap_or_else(|| OsStr::new("Button Graph"))
                 .to_string_lossy()
                 .into_owned()
         } else {
@@ -76,8 +86,8 @@ impl ControllerButtonGraph {
             .enumerate()
             .map(|(i, (key, vec))| {
                 let mapped_boxes: Vec<BoxElem> = vec
-                    .to_vec()
-                    .into_iter()
+                    .iter()
+                    .cloned()
                     .map(|mut e| {
                         e.argument = i as f64;
                         e
@@ -87,14 +97,12 @@ impl ControllerButtonGraph {
             })
             .collect();
 
-        // TODO: generate a unique ID
-        Plot::new("Button Data")
+        Plot::new(self.plot_id.clone())
             .legend(Legend::default())
             .show(ui, |plot_ui| {
                 box_plots
                     .into_iter()
                     .for_each(|box_plot| plot_ui.box_plot(box_plot));
-            })
-            .response;
+            });
     }
 }
