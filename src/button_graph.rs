@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::OsStr, path::PathBuf};
+use std::{collections::HashMap, ffi::OsStr, ops::RangeInclusive, path::PathBuf};
 
 use eframe::egui::{
     plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot},
@@ -115,8 +115,18 @@ impl EguiView for ControllerButtonGraph {
             })
             .collect();
 
+        let x_fmt = |x: f64, _range: &RangeInclusive<f64>| {
+            // format to datetime string
+            let datetime = chrono::DateTime::<chrono::Utc>::from_utc(
+                chrono::NaiveDateTime::from_timestamp(x as i64, 0),
+                chrono::Utc,
+            );
+            datetime.format("%b %e, %Y %H:%M:%S").to_string()
+        };
+
         Plot::new(self.plot_id.clone())
             .legend(Legend::default())
+            .x_axis_formatter(x_fmt)
             .show(ui, |plot_ui| {
                 box_plots
                     .into_iter()
