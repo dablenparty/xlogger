@@ -8,6 +8,8 @@ use log::info;
 
 use crate::{BoxedResult, ControllerButtonEvent, EguiView};
 
+const DATETIME_FORMAT: &str = "%b %e, %Y %H:%M:%S";
+
 pub struct ControllerButtonGraph {
     csv_data: Option<HashMap<String, Vec<BoxElem>>>,
     data_path: Option<PathBuf>,
@@ -43,6 +45,16 @@ impl ControllerButtonGraph {
                 |mut acc, result| {
                     let event = result?;
                     let duration = event.release_time - event.press_time;
+                    let as_datetime = chrono::DateTime::<chrono::Utc>::from_utc(
+                        chrono::NaiveDateTime::from_timestamp(event.press_time as i64, 0),
+                        chrono::Utc,
+                    );
+                    let elem_name = format!(
+                        "Button: {}\nPressed at: {}\nHeld for: {:.2}s",
+                        event.button,
+                        as_datetime.format(DATETIME_FORMAT),
+                        duration
+                    );
                     let box_elem = BoxElem::new(
                         0.5,
                         BoxSpread::new(
@@ -54,12 +66,11 @@ impl ControllerButtonGraph {
                         ),
                     )
                     .whisker_width(0.0)
-                    .name(format!("{} ({:.2}s)", event.button, duration));
-                    match acc.get_mut(&event.button) {
-                        Some(vec) => vec.push(box_elem),
-                        None => {
-                            acc.insert(event.button, vec![box_elem]);
-                        }
+                    .name(elem_name);
+                    if let Some(vec) = acc.get_mut(&event.button) {
+                        vec.push(box_elem);
+                    } else {
+                        acc.insert(event.button, vec![box_elem]);
                     }
                     Ok(acc)
                 },
@@ -121,7 +132,7 @@ impl EguiView for ControllerButtonGraph {
                 chrono::NaiveDateTime::from_timestamp(x as i64, 0),
                 chrono::Utc,
             );
-            datetime.format("%b %e, %Y %H:%M:%S").to_string()
+            datetime.format(DATETIME_FORMAT).to_string()
         };
 
         Plot::new(self.plot_id.clone())
