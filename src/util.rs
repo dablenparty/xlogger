@@ -40,3 +40,15 @@ pub fn get_exe_parent_dir() -> PathBuf {
         })
         .to_path_buf()
 }
+
+/// Gets the name for a GILRS button
+///
+/// # Arguments
+///
+/// * `button`: The GILRS button to get the name for
+///
+/// returns: `String`
+pub fn get_button_name(button: gilrs::Button) -> String {
+    // TODO: add platform maps (e.g., Xbox, PS, etc.)
+    format!("{:?}", button)
+}
