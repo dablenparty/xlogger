@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
 mod util;
+pub mod stick_graph;
 
 pub type BoxedResult<T> = Result<T, Box<dyn std::error::Error>>;
 
