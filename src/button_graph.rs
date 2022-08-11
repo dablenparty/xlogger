@@ -2,7 +2,7 @@ use std::{collections::HashMap, ffi::OsStr, ops::RangeInclusive, path::PathBuf};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use eframe::egui::{
-    plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot},
+    plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot, Value},
     ComboBox, Context, Ui, Window,
 };
 use log::info;
@@ -10,8 +10,8 @@ use strum::IntoEnumIterator;
 
 use crate::{BoxedResult, ControllerButtonEvent, ControllerType, EguiView};
 
-const DATETIME_FORMAT: &str = "%b %e, %Y %H:%M:%S";
-const TIME_FORMAT: &str = "%H:%M:%S";
+const DATETIME_FORMAT: &str = "%b %e, %Y %I:%M:%S %p";
+const TIME_FORMAT: &str = "%I:%M:%S %p";
 
 pub struct ControllerButtonGraph {
     csv_data: Option<HashMap<gilrs::Button, Vec<ControllerButtonEvent>>>,
@@ -92,7 +92,7 @@ impl EguiView for ControllerButtonGraph {
             TIME_FORMAT
         };
         let flat_data: Vec<(String, Vec<BoxElem>)> = data
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(i, (button, events))| {
                 let button_name = self.controller_type.get_button_name(*button);
@@ -106,7 +106,7 @@ impl EguiView for ControllerButtonGraph {
                         )
                         .format(date_format);
                         let elem_name = format!(
-                            "Button: {}\nPressed at: {}\nHeld for: {:.2}",
+                            "Button: {}\nPressed at: {}\nHeld for: {:.2}s",
                             button_name, pressed_at_string, duration
                         );
                         BoxElem::new(
@@ -139,11 +139,18 @@ impl EguiView for ControllerButtonGraph {
             })
             .collect();
 
+        // formatter for the x-axis
         let x_fmt = |x: f64, _range: &RangeInclusive<f64>| {
-            // format to datetime string
             let datetime =
                 DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(x as i64, 0), Utc);
             datetime.format(date_format).to_string()
+        };
+
+        // formatter for the info displayed next to the cursor
+        let coord_fmt = |_string: &str, value: &Value| {
+            let datetime_value =
+                DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(value.x as i64, 0), Utc);
+            datetime_value.format(date_format).to_string()
         };
 
         ui.horizontal(|ui| {
@@ -163,6 +170,7 @@ impl EguiView for ControllerButtonGraph {
         });
         Plot::new(self.plot_id.clone())
             .legend(Legend::default())
+            .label_formatter(coord_fmt)
             .x_axis_formatter(x_fmt)
             .show_axes([true, false])
             .show(ui, |plot_ui| {
