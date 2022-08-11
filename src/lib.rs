@@ -299,7 +299,7 @@ impl ControllerType {
     /// returns: `String`
     pub fn get_button_name(&self, button: gilrs::Button) -> String {
         match self {
-            ControllerType::Unknown => format("{:?}", button),
+            ControllerType::Unknown => format!("{:?}", button),
             ControllerType::Xbox => get_xbox_button(button),
             ControllerType::PlayStation => get_playstation_button(button),
         }
