@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::time::SystemTime;
 
-use eframe::egui::Ui;
+use eframe::egui::{Context, Ui};
 use eframe::epaint::Color32;
 use gilrs::{Axis, Gilrs};
 use log::{error, warn};
@@ -17,6 +17,11 @@ pub mod stick_graph;
 pub mod util;
 
 pub type BoxedResult<T> = Result<T, Box<dyn std::error::Error>>;
+
+pub trait EguiView {
+    fn show(&mut self, ctx: &Context, is_open: &mut bool);
+    fn ui(&mut self, ui: &mut Ui);
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
