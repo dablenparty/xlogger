@@ -32,8 +32,7 @@ struct ButtonGraphProps {
 struct XloggerApp {
     should_run: Arc<AtomicBool>,
     saved_text: StatefulText,
-    stick_graph: ControllerStickGraph,
-    show_stick_graph: bool,
+    stick_graphs: Vec<(bool, ControllerStickGraph)>,
     button_graph_props: ButtonGraphProps,
 }
 
@@ -72,10 +71,11 @@ impl eframe::App for XloggerApp {
                     // opens to the data folder
                     // if it doesn't exist, RFD defaults to the Documents folder
                     if let Some(path) = open_dialog_in_data_folder() {
-                        if let Err(e) = self.stick_graph.load(path) {
+                        let mut graph = ControllerStickGraph::default();
+                        if let Err(e) = graph.load(path) {
                             error!("{:?}", e);
                         } else {
-                            self.show_stick_graph = true;
+                            self.stick_graphs.push((true, graph));
                         }
                     }
                 };
@@ -87,7 +87,13 @@ impl eframe::App for XloggerApp {
                     }
                 }
             });
-            self.stick_graph.show(ctx, &mut self.show_stick_graph);
+            self.stick_graphs
+                .iter_mut()
+                .for_each(|(show_graph, graph)| {
+                    graph.show(ctx, show_graph);
+                });
+            // remove the stick graphs that are closed (they're set to show when they're created)
+            self.stick_graphs.retain(|(show_graph, _)| *show_graph);
             // TODO: extract windows into their own impl structs
             if self.button_graph_props.show_graph {
                 let window = egui::Window::new("Button Graph")
