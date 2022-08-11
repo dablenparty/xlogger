@@ -42,6 +42,7 @@ impl ControllerButtonGraph {
                 HashMap::new(),
                 |mut acc, result| {
                     let event = result?;
+                    let duration = event.release_time - event.press_time;
                     let box_elem = BoxElem::new(
                         0.5,
                         BoxSpread::new(
@@ -51,7 +52,9 @@ impl ControllerButtonGraph {
                             event.release_time,
                             event.release_time,
                         ),
-                    );
+                    )
+                    .whisker_width(0.0)
+                    .name(format!("{} ({:.2}s)", event.button, duration));
                     match acc.get_mut(&event.button) {
                         Some(vec) => vec.push(box_elem),
                         None => {
@@ -104,7 +107,11 @@ impl EguiView for ControllerButtonGraph {
                         e
                     })
                     .collect();
-                BoxPlot::new(mapped_boxes).name(key).horizontal()
+                let formatter = |elem: &BoxElem, _plot: &BoxPlot| elem.name.clone();
+                BoxPlot::new(mapped_boxes)
+                    .name(key)
+                    .horizontal()
+                    .element_formatter(Box::new(formatter))
             })
             .collect();
 
