@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{ffi::OsStr, path::PathBuf};
 
 use eframe::egui::{
     plot::{Legend, Line, Plot, Points, Value, Values},
@@ -61,7 +61,16 @@ impl ControllerStickGraph {
     /// * `ctx` - The egui context to use.
     /// * `open` - Whether the window is open or not.
     pub fn show(&mut self, ctx: &Context, open: &mut bool) {
-        Window::new("Stick Graph")
+        let title = if let Some(path) = self.data_path.as_ref() {
+            path.as_path()
+                .file_name()
+                .unwrap_or(OsStr::new("Stick Graph"))
+                .to_string_lossy()
+                .into_owned()
+        } else {
+            "No data loaded".to_string()
+        };
+        Window::new(title)
             .resizable(true)
             .collapsible(true)
             .title_bar(true)
