@@ -282,7 +282,7 @@ impl StatefulText {
 }
 
 #[repr(u16)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ControllerType {
     Default = 1,
     Xbox = 2,
