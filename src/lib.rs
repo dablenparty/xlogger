@@ -45,7 +45,7 @@ pub struct ControllerButtonEvent {
     /// When the button was released
     pub release_time: f64,
     /// The button that was pressed
-    pub button: String,
+    pub button_name: String,
 }
 
 /// Represents a controller stick event. This struct tracks both sticks at once.
@@ -176,7 +176,7 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
                                 .duration_since(SystemTime::UNIX_EPOCH)
                                 .expect("time was before the epoch!")
                                 .as_secs_f64(),
-                            button: name.clone(),
+                            button_name: name.clone(),
                         };
                         button_csv_writer.serialize(&button_event)?;
                         button_csv_writer.flush()?;

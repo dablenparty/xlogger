@@ -51,7 +51,7 @@ impl ControllerButtonGraph {
                     );
                     let elem_name = format!(
                         "Button: {}\nPressed at: {}\nHeld for: {:.2}s",
-                        event.button,
+                        event.button_name,
                         as_datetime.format(DATETIME_FORMAT),
                         duration
                     );
@@ -67,10 +67,10 @@ impl ControllerButtonGraph {
                     )
                     .whisker_width(0.0)
                     .name(elem_name);
-                    if let Some(vec) = acc.get_mut(&event.button) {
+                    if let Some(vec) = acc.get_mut(&event.button_name) {
                         vec.push(box_elem);
                     } else {
-                        acc.insert(event.button, vec![box_elem]);
+                        acc.insert(event.button_name, vec![box_elem]);
                     }
                     Ok(acc)
                 },
