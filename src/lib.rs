@@ -12,16 +12,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
-mod util;
+pub mod button_graph;
+pub mod stick_graph;
+pub mod util;
 
 pub type BoxedResult<T> = Result<T, Box<dyn std::error::Error>>;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-struct ControllerButtonEvent {
-    press_time: f64,
-    release_time: f64,
-    button: String,
+pub struct ControllerButtonEvent {
+    pub press_time: f64,
+    pub release_time: f64,
+    pub button: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
