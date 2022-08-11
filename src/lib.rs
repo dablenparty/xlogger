@@ -9,6 +9,7 @@ use eframe::epaint::Color32;
 use gilrs::{Axis, Gilrs};
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
+use strum::EnumIter;
 use util::get_button_name;
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
@@ -282,7 +283,7 @@ impl StatefulText {
 }
 
 #[repr(u16)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, EnumIter)]
 pub enum ControllerType {
     Default = 1,
     Xbox = 2,
