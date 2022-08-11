@@ -1,14 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::collections::HashMap;
 use std::fs::File;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 
-use eframe::egui::plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot};
-use eframe::egui::{self, Ui};
+use eframe::egui;
 use eframe::IconData;
 use human_panic::setup_panic;
 use image::ImageResult;
@@ -16,7 +13,7 @@ use log::{error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::button_graph::ControllerButtonGraph;
 use xlogger::stick_graph::ControllerStickGraph;
-use xlogger::{open_dialog_in_data_folder, BoxedResult, ControllerButtonEvent, StatefulText};
+use xlogger::{open_dialog_in_data_folder, BoxedResult, StatefulText};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 

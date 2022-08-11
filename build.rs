@@ -1,7 +1,6 @@
 use std::{env, fs::File, io::BufWriter, path::PathBuf};
 
 use image::{ImageOutputFormat, ImageResult};
-use winres;
 
 fn main() -> ImageResult<()> {
     #[cfg(windows)]
