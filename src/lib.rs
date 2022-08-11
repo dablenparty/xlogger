@@ -9,6 +9,7 @@ use eframe::epaint::Color32;
 use gilrs::{Axis, Gilrs};
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
+use util::get_button_name;
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -45,7 +46,7 @@ pub struct ControllerButtonEvent {
     /// When the button was released
     pub release_time: f64,
     /// The button that was pressed
-    pub button_name: String,
+    pub button: gilrs::Button,
 }
 
 /// Represents a controller stick event. This struct tracks both sticks at once.
@@ -159,9 +160,10 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
                             stick_event, e
                         );
                     }
+                    stick_csv_writer.flush()?;
                 }
                 gilrs::EventType::ButtonChanged(button, value, ..) => {
-                    let name = format!("{:?}", button);
+                    let name = get_button_name(button);
 
                     if value == 0.0 {
                         let down_time = time_map.remove(&name).unwrap_or_else(SystemTime::now);
@@ -176,9 +178,14 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
                                 .duration_since(SystemTime::UNIX_EPOCH)
                                 .expect("time was before the epoch!")
                                 .as_secs_f64(),
-                            button_name: name.clone(),
+                            button,
                         };
-                        button_csv_writer.serialize(&button_event)?;
+                        if let Err(e) = button_csv_writer.serialize(&button_event) {
+                            error!(
+                                "failed to write button event <{:?}> to csv with following error: {:?}",
+                                button_event, e
+                            );
+                        }
                         button_csv_writer.flush()?;
                     } else {
                         // only insert if it doesn't have a value (aka has the default value)

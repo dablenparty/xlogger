@@ -7,13 +7,13 @@ use eframe::egui::{
 };
 use log::info;
 
-use crate::{BoxedResult, ControllerButtonEvent, EguiView};
+use crate::{BoxedResult, ControllerButtonEvent, EguiView, util::get_button_name};
 
 const DATETIME_FORMAT: &str = "%b %e, %Y %H:%M:%S";
 const TIME_FORMAT: &str = "%H:%M:%S";
 
 pub struct ControllerButtonGraph {
-    csv_data: Option<HashMap<String, Vec<BoxElem>>>,
+    csv_data: Option<HashMap<gilrs::Button, Vec<BoxElem>>>,
     data_path: Option<PathBuf>,
     plot_id: String,
     show_date: bool,
@@ -45,7 +45,7 @@ impl ControllerButtonGraph {
         // TODO: move element construction to ui function
         let data = csv::Reader::from_path(&data_path)?
             .deserialize::<ControllerButtonEvent>()
-            .try_fold::<_, _, BoxedResult<HashMap<String, Vec<BoxElem>>>>(
+            .try_fold::<_, _, BoxedResult<HashMap<gilrs::Button, Vec<BoxElem>>>>(
                 HashMap::new(),
                 |mut acc, result| {
                     let event = result?;
@@ -56,7 +56,7 @@ impl ControllerButtonGraph {
                     );
                     let elem_name = format!(
                         "Button: {}\nPressed at: {}\nHeld for: {:.2}s",
-                        event.button_name,
+                        get_button_name(event.button),
                         as_datetime.format(DATETIME_FORMAT),
                         duration
                     );
@@ -72,10 +72,10 @@ impl ControllerButtonGraph {
                     )
                     .whisker_width(0.0)
                     .name(elem_name);
-                    if let Some(vec) = acc.get_mut(&event.button_name) {
+                    if let Some(vec) = acc.get_mut(&event.button) {
                         vec.push(box_elem);
                     } else {
-                        acc.insert(event.button_name, vec![box_elem]);
+                        acc.insert(event.button, vec![box_elem]);
                     }
                     Ok(acc)
                 },
@@ -125,7 +125,7 @@ impl EguiView for ControllerButtonGraph {
                     .collect();
                 let formatter = |elem: &BoxElem, _plot: &BoxPlot| elem.name.clone();
                 BoxPlot::new(mapped_boxes)
-                    .name(key)
+                    .name(get_button_name(*key))
                     .horizontal()
                     .element_formatter(Box::new(formatter))
             })
