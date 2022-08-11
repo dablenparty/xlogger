@@ -13,11 +13,8 @@ use log::{error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::button_graph::ControllerButtonGraph;
 use xlogger::stick_graph::ControllerStickGraph;
+use xlogger::util::{create_dir_if_not_exists, get_exe_parent_dir};
 use xlogger::{open_dialog_in_data_folder, BoxedResult, StatefulText};
-
-use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
-
-mod util;
 
 #[derive(Default)]
 struct XloggerApp {
