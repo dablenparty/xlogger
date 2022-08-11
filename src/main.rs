@@ -7,37 +7,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 
-use eframe::egui::plot::{BoxElem, BoxPlot, BoxSpread, Legend, Line, Plot, Points, Value, Values};
-use eframe::egui::{self, Slider, Ui};
+use eframe::egui::plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot};
+use eframe::egui::{self, Ui};
 use eframe::IconData;
 use human_panic::setup_panic;
 use image::ImageResult;
 use log::{error, info, LevelFilter};
 use simplelog::{Config, WriteLogger};
-use xlogger::{
-    open_dialog_in_data_folder, BoxedResult, ControllerButtonEvent, ControllerStickEvent,
-    StatefulText,
-};
+use xlogger::stick_graph::ControllerStickGraph;
+use xlogger::{open_dialog_in_data_folder, BoxedResult, ControllerButtonEvent, StatefulText};
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
 mod util;
-
-#[derive(Clone)]
-struct ControllerStickData {
-    left_values: Vec<Value>,
-    right_values: Vec<Value>,
-}
-
-#[derive(Default)]
-struct StickGraphProps {
-    csv_data: Option<ControllerStickData>,
-    data_offset: u8,
-    data_path: Option<PathBuf>,
-    show_graph: bool,
-    show_lines: bool,
-    slider_timestamp: usize,
-}
 
 #[derive(Default)]
 struct ButtonGraphProps {
@@ -50,7 +32,8 @@ struct ButtonGraphProps {
 struct XloggerApp {
     should_run: Arc<AtomicBool>,
     saved_text: StatefulText,
-    stick_graph_props: StickGraphProps,
+    stick_graph: ControllerStickGraph,
+    show_stick_graph: bool,
     button_graph_props: ButtonGraphProps,
 }
 
@@ -89,9 +72,11 @@ impl eframe::App for XloggerApp {
                     // opens to the data folder
                     // if it doesn't exist, RFD defaults to the Documents folder
                     if let Some(path) = open_dialog_in_data_folder() {
-                        self.stick_graph_props.data_path = Some(path);
-                        self.stick_graph_props.show_graph = true;
-                        self.stick_graph_props.csv_data = None
+                        if let Err(e) = self.stick_graph.load(path) {
+                            error!("{:?}", e);
+                        } else {
+                            self.show_stick_graph = true;
+                        }
                     }
                 };
                 if ui.button("Visualize Buttons").clicked() {
@@ -102,26 +87,8 @@ impl eframe::App for XloggerApp {
                     }
                 }
             });
+            self.stick_graph.show(ctx, &mut self.show_stick_graph);
             // TODO: extract windows into their own impl structs
-            if self.stick_graph_props.show_graph {
-                let window = egui::Window::new("Stick Graph")
-                    .resizable(true)
-                    .collapsible(true)
-                    .title_bar(true);
-                window.show(ctx, |ui| {
-                    // show sticks plot or handle error
-                    if let Err(e) = self.visualize_stick_data(ui) {
-                        error!(
-                            "Something went wrong deserializing data at {:#?}:",
-                            self.stick_graph_props.data_path,
-                        );
-                        error!("{}", e);
-                        self.stick_graph_props.show_graph = false;
-                        self.stick_graph_props.csv_data = None;
-                        self.stick_graph_props.data_path = None;
-                    }
-                });
-            }
             if self.button_graph_props.show_graph {
                 let window = egui::Window::new("Button Graph")
                     .resizable(true)
@@ -217,115 +184,6 @@ impl XloggerApp {
                 .response,
         ))
     }
-
-    /// Visualizes the stick data in the given file.
-    ///
-    /// # Arguments
-    ///
-    /// * `ui` - The UI to draw to.
-    ///
-    /// # Errors
-    ///
-    /// This function errors if there is an issue reading the CSV file defined by `self.visualize_path`
-    /// or if there is an issue deserializing the data such as malformed, missing, or extra columns.
-    ///
-    /// returns: `Result<Option<egui::Response>, Box<dyn Error>>`
-    fn visualize_stick_data(&mut self, ui: &mut Ui) -> BoxedResult<Option<egui::Response>> {
-        let stick_graph_props = &mut self.stick_graph_props;
-        if stick_graph_props.data_path.is_none() {
-            return Ok(None);
-        }
-        // at this point, we know it's not None
-        let path = stick_graph_props.data_path.as_ref().unwrap();
-        // try to get the cached CSV data. if it doesn't exist, read it from the file
-        let (ls_events, rs_events) = if let Some(data) = &stick_graph_props.csv_data {
-            let data = data.clone();
-            (data.left_values, data.right_values)
-        } else {
-            info!("reading stick data from {}", path.display());
-            let (left_values, right_values) = csv::Reader::from_path(path)?
-                .deserialize::<ControllerStickEvent>()
-                .try_fold::<_, _, BoxedResult<(Vec<Value>, Vec<Value>)>>(
-                    (Vec::new(), Vec::new()),
-                    |mut acc, result| {
-                        let event = result?;
-                        acc.0.push(Value::new(event.left_x, event.left_y));
-                        acc.1.push(Value::new(event.right_x, event.right_y));
-                        Ok((acc.0, acc.1))
-                    },
-                )?;
-            let data = ControllerStickData {
-                left_values,
-                right_values,
-            };
-            stick_graph_props.csv_data = Some(data.clone());
-            (data.left_values, data.right_values)
-        };
-
-        // slice the data for the selected range
-        // e.g., if the offset is 10 and the timestamp is 15, we'll slice the data from 5 to 15
-        let ls_sliced = &ls_events[stick_graph_props
-            .slider_timestamp
-            .saturating_sub(stick_graph_props.data_offset.into())
-            ..stick_graph_props.slider_timestamp];
-        let ls_values = Values::from_values(ls_sliced.to_vec());
-
-        let rs_sliced = &rs_events[stick_graph_props
-            .slider_timestamp
-            .saturating_sub(stick_graph_props.data_offset.into())
-            ..stick_graph_props.slider_timestamp];
-        // this moves the points to the right so that this data is not on top of the previous data
-        let translated_vec = rs_sliced
-            .iter()
-            .map(|element| Value::new(element.x + 2.5, element.y))
-            .collect::<Vec<Value>>();
-        let rs_values = Values::from_values(translated_vec);
-        ui.horizontal(|ui| {
-            ui.label("Time");
-            // usize should always convert to u64
-            ui.add(Slider::new(
-                &mut stick_graph_props.slider_timestamp,
-                0..=ls_events.len(),
-            ));
-            ui.checkbox(&mut stick_graph_props.show_lines, "Show lines");
-            if ls_events.len() == usize::MAX {
-                ui.label("Warning: too much data to visualize! not all of it will be shown");
-            }
-        });
-        ui.horizontal(|ui| {
-            ui.label("Number of points displayed");
-            ui.add(Slider::new(
-                &mut stick_graph_props.data_offset,
-                u8::MIN..=u8::MAX,
-            ))
-            .on_hover_text("Higher values may cause performance issues");
-        });
-        Ok(Some(
-            Plot::new("Stick Data")
-                .data_aspect(1.0)
-                .legend(Legend::default())
-                .show(ui, |plot_ui| {
-                    let point_radius = 1.0;
-
-                    if stick_graph_props.show_lines {
-                        plot_ui.line(Line::new(ls_values).name("Left Stick"));
-                        plot_ui.line(Line::new(rs_values).name("Right Stick"));
-                    } else {
-                        plot_ui.points(
-                            Points::new(ls_values)
-                                .radius(point_radius)
-                                .name("Left Stick"),
-                        );
-                        plot_ui.points(
-                            Points::new(rs_values)
-                                .radius(point_radius)
-                                .name("Right Stick"),
-                        );
-                    }
-                })
-                .response,
-        ))
-    }
 }
 
 /// Initializes the logging library
@@ -385,11 +243,10 @@ fn main() {
     };
     let should_run = Arc::new(AtomicBool::new(false));
 
-    let mut app = XloggerApp {
+    let app = XloggerApp {
         should_run,
         ..XloggerApp::default()
     };
-    app.stick_graph_props.data_offset = 50;
     let native_options = match get_icon_data() {
         Ok(icon_data) => eframe::NativeOptions {
             icon_data: Some(icon_data),
