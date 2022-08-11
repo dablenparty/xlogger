@@ -280,3 +280,61 @@ impl StatefulText {
         ui.colored_label(color, &self.text);
     }
 }
+
+#[repr(u16)]
+#[derive(Debug)]
+pub enum ControllerType {
+    Unknown = 1,
+    Xbox = 2,
+    PlayStation = 3,
+}
+
+impl ControllerType {
+    /// Returns the name of the button based on its `ControllerType`.
+    ///
+    /// # Arguments
+    ///
+    /// * `button`: The button to get the name of.
+    ///
+    /// returns: `String`
+    pub fn get_button_name(&self, button: gilrs::Button) -> String {
+        match self {
+            ControllerType::Unknown => format("{:?}", button),
+            ControllerType::Xbox => get_xbox_button(button),
+            ControllerType::PlayStation => get_playstation_button(button),
+        }
+    }
+}
+
+fn get_xbox_button(button: gilrs::Button) -> String {
+    match button {
+        gilrs::Button::South => "A".to_string(),
+        gilrs::Button::East => "B".to_string(),
+        gilrs::Button::North => "Y".to_string(),
+        gilrs::Button::West => "X".to_string(),
+        gilrs::Button::LeftTrigger => "LB".to_string(),
+        gilrs::Button::LeftTrigger2 => "LT".to_string(),
+        gilrs::Button::RightTrigger => "RB".to_string(),
+        gilrs::Button::RightTrigger2 => "RT".to_string(),
+        gilrs::Button::LeftThumb => "LS".to_string(),
+        gilrs::Button::RightThumb => "RS".to_string(),
+        _ => format!("{:?}", button),
+    }
+}
+
+fn get_playstation_button(button: gilrs::Button) -> String {
+    // TODO: use symbols
+    match button {
+        gilrs::Button::South => "X".to_string(),
+        gilrs::Button::East => "O".to_string(),
+        gilrs::Button::North => "Triangle".to_string(),
+        gilrs::Button::West => "Square".to_string(),
+        gilrs::Button::LeftTrigger => "L1".to_string(),
+        gilrs::Button::LeftTrigger2 => "L2".to_string(),
+        gilrs::Button::RightTrigger => "R1".to_string(),
+        gilrs::Button::RightTrigger2 => "R2".to_string(),
+        gilrs::Button::LeftThumb => "LS".to_string(),
+        gilrs::Button::RightThumb => "RS".to_string(),
+        _ => format!("{:?}", button),
+    }
+}
