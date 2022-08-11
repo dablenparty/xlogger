@@ -6,7 +6,7 @@ use eframe::egui::{
 };
 use log::info;
 
-use crate::{BoxedResult, ControllerButtonEvent};
+use crate::{BoxedResult, ControllerButtonEvent, EguiView};
 
 pub struct ControllerButtonGraph {
     csv_data: Option<HashMap<String, Vec<BoxElem>>>,
@@ -65,14 +65,10 @@ impl ControllerButtonGraph {
         self.csv_data = Some(data);
         Ok(())
     }
+}
 
-    /// Show the graph in a window
-    ///
-    /// # Arguments
-    ///
-    /// * `context` - The context to use for the window
-    /// * `open` - Mutable reference to the open state of the window
-    pub fn show(&mut self, ctx: &Context, open: &mut bool) {
+impl EguiView for ControllerButtonGraph {
+    fn show(&mut self, ctx: &Context, is_open: &mut bool) {
         let title = if let Some(path) = self.data_path.as_ref() {
             path.as_path()
                 .file_name()
@@ -86,15 +82,10 @@ impl ControllerButtonGraph {
             .resizable(true)
             .collapsible(true)
             .title_bar(true)
-            .open(open)
+            .open(is_open)
             .show(ctx, |ui| self.ui(ui));
     }
 
-    /// Private helper function to construct the UI for the graph window
-    ///
-    /// # Arguments
-    ///
-    /// * `ui` - The UI to build on
     fn ui(&mut self, ui: &mut Ui) {
         if self.csv_data.is_none() {
             ui.label("No data loaded");

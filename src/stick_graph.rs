@@ -6,7 +6,7 @@ use eframe::egui::{
 };
 use log::{info, warn};
 
-use crate::{BoxedResult, ControllerStickEvent};
+use crate::{BoxedResult, ControllerStickEvent, EguiView};
 
 #[derive(Clone)]
 struct ControllerStickData {
@@ -66,14 +66,10 @@ impl ControllerStickGraph {
         });
         Ok(())
     }
+}
 
-    /// Shows the graph window.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The egui context to use.
-    /// * `open` - Whether the window is open or not.
-    pub fn show(&mut self, ctx: &Context, open: &mut bool) {
+impl EguiView for ControllerStickGraph {
+    fn show(&mut self, ctx: &Context, is_open: &mut bool) {
         let title = if let Some(path) = self.data_path.as_ref() {
             path.as_path()
                 .file_name()
@@ -87,15 +83,10 @@ impl ControllerStickGraph {
             .resizable(true)
             .collapsible(true)
             .title_bar(true)
-            .open(open)
+            .open(is_open)
             .show(ctx, |ui| self.ui(ui));
     }
 
-    /// Private helper method to construct the UI for the graph window.
-    ///
-    /// # Arguments
-    ///
-    /// * `ui` - The egui UI to use.
     fn ui(&mut self, ui: &mut Ui) {
         if self.csv_data.is_none() {
             ui.label("No stick data loaded");
