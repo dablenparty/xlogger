@@ -3,11 +3,11 @@ use std::{collections::HashMap, ffi::OsStr, ops::RangeInclusive, path::PathBuf};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use eframe::egui::{
     plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot},
-    Context, Ui, Window,
+    ComboBox, Context, Ui, Window,
 };
 use log::info;
 
-use crate::{util::get_button_name, BoxedResult, ControllerButtonEvent, EguiView};
+use crate::{BoxedResult, ControllerButtonEvent, ControllerType, EguiView};
 
 const DATETIME_FORMAT: &str = "%b %e, %Y %H:%M:%S";
 const TIME_FORMAT: &str = "%H:%M:%S";
@@ -17,6 +17,7 @@ pub struct ControllerButtonGraph {
     data_path: Option<PathBuf>,
     plot_id: String,
     show_date: bool,
+    controller_type: ControllerType,
 }
 
 impl Default for ControllerButtonGraph {
@@ -25,6 +26,7 @@ impl Default for ControllerButtonGraph {
             csv_data: None,
             data_path: None,
             show_date: false,
+            controller_type: ControllerType::default(),
             plot_id: uuid::Uuid::new_v4().to_string(),
         }
     }
@@ -92,7 +94,7 @@ impl EguiView for ControllerButtonGraph {
             .into_iter()
             .enumerate()
             .map(|(i, (button, events))| {
-                let button_name = get_button_name(*button);
+                let button_name = self.controller_type.get_button_name(*button);
                 let elems: Vec<BoxElem> = events
                     .iter()
                     .map(|e| {
@@ -143,7 +145,29 @@ impl EguiView for ControllerButtonGraph {
             datetime.format(date_format).to_string()
         };
 
-        ui.checkbox(&mut self.show_date, "Show date");
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.show_date, "Show date");
+            ui.spacing();
+            ComboBox::from_label("Controller Type")
+                .selected_text(format!("{:?}", self.controller_type))
+                .show_ui(ui, |combo_ui| {
+                    combo_ui.selectable_value(
+                        &mut self.controller_type,
+                        ControllerType::Default,
+                        "Default",
+                    );
+                    combo_ui.selectable_value(
+                        &mut self.controller_type,
+                        ControllerType::Xbox,
+                        "Xbox",
+                    );
+                    combo_ui.selectable_value(
+                        &mut self.controller_type,
+                        ControllerType::PlayStation,
+                        "PlayStation",
+                    );
+                });
+        });
         Plot::new(self.plot_id.clone())
             .legend(Legend::default())
             .x_axis_formatter(x_fmt)
