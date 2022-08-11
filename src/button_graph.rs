@@ -138,6 +138,7 @@ impl EguiView for ControllerButtonGraph {
         Plot::new(self.plot_id.clone())
             .legend(Legend::default())
             .x_axis_formatter(x_fmt)
+            .show_axes([true, false])
             .show(ui, |plot_ui| {
                 box_plots
                     .into_iter()
