@@ -25,6 +25,15 @@ impl Default for ControllerButtonGraph {
 }
 
 impl ControllerButtonGraph {
+    /// Load CSV data into this graph
+    ///
+    /// # Arguments
+    ///
+    /// * `data_path` - Path to the CSV file to load
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the CSV data is invalid or not found.
     pub fn load(&mut self, data_path: PathBuf) -> BoxedResult<()> {
         info!("loading button data from {}", data_path.display());
         let data = csv::Reader::from_path(&data_path)?
@@ -57,6 +66,12 @@ impl ControllerButtonGraph {
         Ok(())
     }
 
+    /// Show the graph in a window
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The context to use for the window
+    /// * `open` - Mutable reference to the open state of the window
     pub fn show(&mut self, ctx: &Context, open: &mut bool) {
         let title = if let Some(path) = self.data_path.as_ref() {
             path.as_path()
@@ -75,6 +90,11 @@ impl ControllerButtonGraph {
             .show(ctx, |ui| self.ui(ui));
     }
 
+    /// Private helper function to construct the UI for the graph window
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI to build on
     fn ui(&mut self, ui: &mut Ui) {
         if self.csv_data.is_none() {
             ui.label("No data loaded");
