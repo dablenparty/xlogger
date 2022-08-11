@@ -16,34 +16,60 @@ pub mod button_graph;
 pub mod stick_graph;
 pub mod util;
 
+/// Helper type for a Result that can trap any boxed error
 pub type BoxedResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+/// Contains functions for displaying a struct with egui
 pub trait EguiView {
+    /// Display the struct with egui
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The egui context to use
+    /// * `is_open` - Mutable reference to the boolean that determines if the window is open
     fn show(&mut self, ctx: &Context, is_open: &mut bool);
+    /// Constructs the UI for the struct
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The egui ui to use
     fn ui(&mut self, ui: &mut Ui);
 }
 
+/// Represents a controller button event
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ControllerButtonEvent {
+    /// When the button was pressed
     pub press_time: f64,
+    /// When the button was released
     pub release_time: f64,
+    /// The button that was pressed
     pub button: String,
 }
 
+/// Represents a controller stick event. This struct tracks both sticks at once.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ControllerStickEvent {
+    /// The time at which the event occurred.
     pub time: f64,
+    /// The x-axis value of the left stick.
     pub left_x: f32,
+    /// The y-axis value of the left stick.
     pub left_y: f32,
+    /// The x-axis value of the right stick.
     pub right_x: f32,
+    /// The y-axis value of the right stick.
     pub right_y: f32,
 }
 
+/// Represents the state of a dual-stick controller.
 #[derive(Debug, Default)]
 struct ControllerStickState {
+    /// The x-axis value of the stick.
     x: f32,
+    /// The y-axis value of the stick.
     y: f32,
 }
 
@@ -171,6 +197,7 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
     Ok(())
 }
 
+/// An enum representing a text state.
 #[derive(Debug)]
 pub enum TextState {
     Success,
@@ -188,7 +215,9 @@ pub enum TextState {
 /// * Warning: yellow
 #[derive(Debug)]
 pub struct StatefulText {
+    /// The text to display.
     pub text: String,
+    /// The state of the text.
     pub state: TextState,
     success_color: Color32,
     error_color: Color32,
