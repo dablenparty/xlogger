@@ -289,6 +289,12 @@ pub enum ControllerType {
     PlayStation = 3,
 }
 
+impl Default for ControllerType {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
 impl ControllerType {
     /// Returns the name of the button based on its `ControllerType`.
     ///
