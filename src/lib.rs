@@ -10,7 +10,6 @@ use gilrs::{Axis, Gilrs};
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
-use util::get_button_name;
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -127,6 +126,8 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
     let mut left_stick_state = ControllerStickState::default();
     let mut right_stick_state = ControllerStickState::default();
 
+    let start_time = SystemTime::now();
+
     while should_run.load(std::sync::atomic::Ordering::Relaxed) {
         while let Some(gilrs::Event {
             event,
@@ -147,7 +148,7 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
                     }
                     let stick_event = ControllerStickEvent {
                         time: event_time
-                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .duration_since(start_time)
                             .expect("time went backwards!")
                             .as_secs_f64(),
                         left_x: left_stick_state.x,
@@ -164,20 +165,18 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
                     stick_csv_writer.flush()?;
                 }
                 gilrs::EventType::ButtonChanged(button, value, ..) => {
-                    let name = get_button_name(button);
+                    let name = format!("{:?}", button);
 
                     if value == 0.0 {
                         let down_time = time_map.remove(&name).unwrap_or_else(SystemTime::now);
-                        // expect is used here because the time should never be before the epoch
-                        // if it is, something bigger is wrong
                         let button_event = ControllerButtonEvent {
                             press_time: down_time
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("time was before the epoch!")
+                                .duration_since(start_time)
+                                .expect("time went backwards!")
                                 .as_secs_f64(),
                             release_time: event_time
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("time was before the epoch!")
+                                .duration_since(start_time)
+                                .expect("time went backwards!")
                                 .as_secs_f64(),
                             button,
                         };
