@@ -2,6 +2,7 @@ use std::fs::create_dir_all;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use chrono::{DateTime, NaiveDateTime, Utc};
 use log::warn;
 
 /// Creates a directory if it does not exist, failing if some other error occurs
@@ -41,14 +42,25 @@ pub fn get_exe_parent_dir() -> PathBuf {
         .to_path_buf()
 }
 
-/// Gets the name for a GILRS button
+/// Formats an f64 to a string with the format "%H:%M:%S.%2f"
 ///
 /// # Arguments
 ///
-/// * `button`: The GILRS button to get the name for
+/// * `secs`: the time to format in seconds
 ///
 /// returns: `String`
-pub fn get_button_name(button: gilrs::Button) -> String {
-    // TODO: add platform maps (e.g., Xbox, PS, etc.)
-    format!("{:?}", button)
+pub fn f64_to_formatted_time(secs: f64) -> String {
+    const TIME_FORMAT: &str = "%H:%M:%S";
+    let datetime = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(secs as i64, 0), Utc)
+        .format(TIME_FORMAT)
+        .to_string();
+    format!(
+        "{}.{:.2}",
+        datetime,
+        secs.fract()
+            .to_string()
+            .split_once(".")
+            .unwrap_or_else(|| ("0", "0"))
+            .1
+    )
 }
