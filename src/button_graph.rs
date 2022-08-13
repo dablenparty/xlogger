@@ -1,6 +1,5 @@
 use std::{collections::HashMap, ffi::OsStr, ops::RangeInclusive, path::PathBuf};
 
-use chrono::{DateTime, NaiveDateTime, Utc};
 use eframe::egui::{
     plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot, Value},
     ComboBox, Context, Ui, Window,
@@ -8,10 +7,9 @@ use eframe::egui::{
 use log::info;
 use strum::IntoEnumIterator;
 
-use crate::{BoxedResult, ControllerButtonEvent, ControllerType, EguiView};
-
-const DATETIME_FORMAT: &str = "%b %e, %Y %I:%M:%S %p";
-const TIME_FORMAT: &str = "%I:%M:%S %p";
+use crate::{
+    util::f64_to_formatted_time, BoxedResult, ControllerButtonEvent, ControllerType, EguiView,
+};
 
 pub struct ControllerButtonGraph {
     csv_data: Option<HashMap<gilrs::Button, Vec<ControllerButtonEvent>>>,
@@ -86,11 +84,6 @@ impl EguiView for ControllerButtonGraph {
             return;
         }
         let data = self.csv_data.as_ref().unwrap();
-        let date_format = if self.show_date {
-            DATETIME_FORMAT
-        } else {
-            TIME_FORMAT
-        };
         let flat_data: Vec<(String, Vec<BoxElem>)> = data
             .iter()
             .enumerate()
@@ -100,11 +93,7 @@ impl EguiView for ControllerButtonGraph {
                     .iter()
                     .map(|e| {
                         let duration = e.release_time - e.press_time;
-                        let pressed_at_string = DateTime::<Utc>::from_utc(
-                            NaiveDateTime::from_timestamp(e.press_time as i64, 0),
-                            Utc,
-                        )
-                        .format(date_format);
+                        let pressed_at_string = f64_to_formatted_time(e.press_time);
                         let elem_name = format!(
                             "Button: {}\nPressed at: {}\nHeld for: {:.2}s",
                             button_name, pressed_at_string, duration
@@ -140,18 +129,10 @@ impl EguiView for ControllerButtonGraph {
             .collect();
 
         // formatter for the x-axis
-        let x_fmt = |x: f64, _range: &RangeInclusive<f64>| {
-            let datetime =
-                DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(x as i64, 0), Utc);
-            datetime.format(date_format).to_string()
-        };
+        let x_fmt = |x: f64, _range: &RangeInclusive<f64>| f64_to_formatted_time(x);
 
         // formatter for the info displayed next to the cursor
-        let coord_fmt = |_string: &str, value: &Value| {
-            let datetime_value =
-                DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(value.x as i64, 0), Utc);
-            datetime_value.format(date_format).to_string()
-        };
+        let coord_fmt = |_string: &str, value: &Value| f64_to_formatted_time(value.x);
 
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.show_date, "Show date");
