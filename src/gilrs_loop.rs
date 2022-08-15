@@ -80,7 +80,7 @@ impl GilrsEventLoop {
 
     /// Stops the event loop. This will block until the event loop has stopped.
     pub fn stop_listening(&mut self) {
-        if self.loop_handle.is_none() {
+        if self.loop_handle.is_none() || !self.is_running() {
             return;
         }
         self.should_record.store(false, Ordering::Relaxed);
