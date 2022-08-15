@@ -19,7 +19,7 @@ use crate::{
 
 #[derive(Default)]
 pub struct GilrsEventLoop {
-    channels: CrossbeamChannelPair<ControllerConnectionEvent>,
+    pub channels: CrossbeamChannelPair<ControllerConnectionEvent>,
     should_record: Arc<AtomicBool>,
     should_run: Arc<AtomicBool>,
     loop_handle: Option<JoinHandle<()>>,
@@ -111,7 +111,7 @@ fn inner_listen(
         while let Some(gilrs::Event {
             event,
             time: event_time,
-            ..
+            id: gamepad_id,
         }) = gilrs.next_event()
         {
             match event {
@@ -174,6 +174,24 @@ fn inner_listen(
                         {
                             time_map.insert(name, event_time);
                         }
+                    }
+                }
+                EventType::Connected | EventType::Disconnected => {
+                    let connected = match event {
+                        EventType::Connected => true,
+                        _ => false,
+                    };
+                    let gamepad_name = gilrs.gamepad(gamepad_id).name().to_string();
+                    let connection_event = ControllerConnectionEvent {
+                        connected,
+                        controller_id: gamepad_id,
+                        gamepad_name,
+                    };
+                    if let Err(e) = channels.tx.send(connection_event.clone()) {
+                        error!(
+                            "failed to send connection event <{:?}> to channel with following error: {:?}",
+                            connection_event, e
+                        );
                     }
                 }
                 _ => {}
