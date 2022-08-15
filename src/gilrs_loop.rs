@@ -1,6 +1,8 @@
 use std::{
     collections::HashMap,
     fmt,
+    fs::File,
+    io,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -89,14 +91,7 @@ impl GilrsEventLoop {
     }
 }
 
-fn inner_listen(
-    should_run: Arc<AtomicBool>,
-    should_record: Arc<AtomicBool>,
-    channels: CrossbeamChannelPair<ControllerConnectionEvent>,
-) -> std::io::Result<()> {
-    // if this fails, the event loop can never run
-    let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
-
+fn make_csv_writers() -> io::Result<(csv::Writer<File>, csv::Writer<File>)> {
     let data_folder = get_exe_parent_dir().join("data");
     create_dir_if_not_exists(&data_folder)?;
     let timestamp_string = chrono::Local::now()
@@ -109,20 +104,62 @@ fn inner_listen(
     let stick_csv_path = data_folder.join("sticks_".to_owned() + &timestamp_string);
 
     // csv writers
-    let mut button_csv_writer = csv::Writer::from_path(button_csv_path)?;
-    let mut stick_csv_writer = csv::Writer::from_path(stick_csv_path)?;
+    let button_csv_writer = csv::Writer::from_path(button_csv_path)?;
+    let stick_csv_writer = csv::Writer::from_path(stick_csv_path)?;
+    Ok((button_csv_writer, stick_csv_writer))
+}
+
+fn inner_listen(
+    should_run: Arc<AtomicBool>,
+    should_record: Arc<AtomicBool>,
+    channels: CrossbeamChannelPair<ControllerConnectionEvent>,
+) -> io::Result<()> {
+    // if this fails, the event loop can never run
+    let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
+    // loads any currently connected controllers into the UI
+    gilrs.gamepads().for_each(|(id, gamepad)| {
+        if let Err(e) = channels.tx.send(ControllerConnectionEvent {
+            connected: true,
+            controller_id: id,
+            gamepad_name: gamepad.name().to_string(),
+        }) {
+            warn!(
+                "Error sending controller connection to main thread: {:?}",
+                e
+            );
+        }
+    });
+
+    // csv writers
+    let mut writers: Option<(csv::Writer<File>, csv::Writer<File>)> = None;
 
     // time map
-    let mut time_map: HashMap<String, SystemTime> = HashMap::new();
+    let mut time_map: HashMap<gilrs::GamepadId, SystemTime> = HashMap::new();
 
     // stick state
     let mut left_stick_state = ControllerStickState::default();
     let mut right_stick_state = ControllerStickState::default();
 
-    let start_time = SystemTime::now();
+    let mut start_time = SystemTime::now();
+    let mut last_record = should_record.load(Ordering::Relaxed);
 
     while should_run.load(Ordering::Relaxed) {
         let should_record = should_record.load(Ordering::Relaxed);
+        if !last_record && should_record {
+            if writers.is_some() {
+                let (button_csv_writer, stick_csv_writer) = &mut writers.as_mut().unwrap();
+                button_csv_writer.flush()?;
+                stick_csv_writer.flush()?;
+            }
+            writers = Some(make_csv_writers()?);
+            time_map.clear();
+            left_stick_state = ControllerStickState::default();
+            right_stick_state = ControllerStickState::default();
+            start_time = SystemTime::now();
+        } else if last_record && !should_record {
+            writers = None;
+        }
+        last_record = should_record;
         while let Some(gilrs::Event {
             event,
             time: event_time,
@@ -138,6 +175,7 @@ fn inner_listen(
                         Axis::RightStickY => right_stick_state.y = value,
                         _ => {
                             warn!("unhandled axis event: {:?}", event);
+                            continue;
                         }
                     }
                     let stick_event = ControllerStickEvent {
@@ -150,6 +188,7 @@ fn inner_listen(
                         right_x: right_stick_state.x,
                         right_y: right_stick_state.y,
                     };
+                    let stick_csv_writer = &mut writers.as_mut().unwrap().1;
                     if let Err(e) = stick_csv_writer.serialize(&stick_event) {
                         error!(
                             "failed to write stick event <{:?}> to csv with following error: {:?}",
@@ -159,10 +198,9 @@ fn inner_listen(
                     stick_csv_writer.flush()?;
                 }
                 EventType::ButtonChanged(button, value, ..) if should_record => {
-                    let name = format!("{:?}", button);
-
                     if value == 0.0 {
-                        let down_time = time_map.remove(&name).unwrap_or_else(SystemTime::now);
+                        let down_time =
+                            time_map.remove(&gamepad_id).unwrap_or_else(SystemTime::now);
                         let button_event = ControllerButtonEvent {
                             press_time: down_time
                                 .duration_since(start_time)
@@ -174,6 +212,7 @@ fn inner_listen(
                                 .as_secs_f64(),
                             button,
                         };
+                        let button_csv_writer = &mut writers.as_mut().unwrap().0;
                         if let Err(e) = button_csv_writer.serialize(&button_event) {
                             error!(
                             "failed to write button event <{:?}> to csv with following error: {:?}",
@@ -183,11 +222,11 @@ fn inner_listen(
                         button_csv_writer.flush()?;
                     } else {
                         // only insert if it doesn't have a value (aka has the default value)
-                        let map_time_opt = time_map.get(&name);
+                        let map_time_opt = time_map.get(&gamepad_id);
                         if map_time_opt.unwrap_or(&SystemTime::UNIX_EPOCH)
                             == &SystemTime::UNIX_EPOCH
                         {
-                            time_map.insert(name, event_time);
+                            time_map.insert(gamepad_id, event_time);
                         }
                     }
                 }
