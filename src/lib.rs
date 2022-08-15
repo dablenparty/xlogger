@@ -39,16 +39,26 @@ pub trait EguiView {
 }
 
 /// A helper struct for working with a pair of MPSC sender & receiver channels
-pub struct MpscChannelPair<T> {
+#[derive(Debug)]
+pub struct CrossbeamChannelPair<T> {
     /// The sender channel
-    pub tx: mpsc::Sender<T>,
+    pub tx: crossbeam_channel::Sender<T>,
     /// The receiver channel
-    pub rx: mpsc::Receiver<T>,
+    pub rx: crossbeam_channel::Receiver<T>,
 }
 
-impl<T> Default for MpscChannelPair<T> {
+impl<T> Clone for CrossbeamChannelPair<T> {
+    fn clone(&self) -> Self {
+        Self {
+            tx: self.tx.clone(),
+            rx: self.rx.clone(),
+        }
+    }
+}
+
+impl<T> Default for CrossbeamChannelPair<T> {
     fn default() -> Self {
-        let (tx, rx) = mpsc::channel::<T>();
+        let (tx, rx) = crossbeam_channel::unbounded::<T>();
         Self { tx, rx }
     }
 }
