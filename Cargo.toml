@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 chrono = "0.4.19"
 csv = "1.1.6"
+crossbeam-channel = "0.5"
 ctrlc = "3.2.2"
 eframe = "0.18.0"
 gilrs = { version = "0.9.0", features = ["serde-serialize"] }
