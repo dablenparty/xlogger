@@ -15,7 +15,6 @@ pub struct ControllerButtonGraph {
     csv_data: Option<HashMap<gilrs::Button, Vec<ControllerButtonEvent>>>,
     data_path: Option<PathBuf>,
     plot_id: String,
-    show_date: bool,
     controller_type: ControllerType,
 }
 
@@ -24,7 +23,6 @@ impl Default for ControllerButtonGraph {
         Self {
             csv_data: None,
             data_path: None,
-            show_date: false,
             controller_type: ControllerType::default(),
             plot_id: uuid::Uuid::new_v4().to_string(),
         }
@@ -84,7 +82,17 @@ impl EguiView for ControllerButtonGraph {
             return;
         }
         let data = self.csv_data.as_ref().unwrap();
-        let flat_data: Vec<(String, Vec<BoxElem>)> = data
+
+        // format info displayed when hovering over a bar
+        let box_plot_formatter = |elem: &BoxElem, _plot: &BoxPlot| elem.name.clone();
+
+        // formatter for the x-axis
+        let x_fmt = |x: f64, _range: &RangeInclusive<f64>| f64_to_formatted_time(x);
+
+        // formatter for the info displayed next to the cursor
+        let coord_fmt = |_string: &str, value: &Value| f64_to_formatted_time(value.x);
+
+        let box_plots: Vec<BoxPlot> = data
             .iter()
             .enumerate()
             .map(|(i, (button, events))| {
@@ -112,43 +120,25 @@ impl EguiView for ControllerButtonGraph {
                         .whisker_width(0.0)
                     })
                     .collect();
-                (button_name, elems)
-            })
-            .collect();
-
-        let box_plot_formatter = |elem: &BoxElem, _plot: &BoxPlot| elem.name.clone();
-
-        let box_plots: Vec<BoxPlot> = flat_data
-            .iter()
-            .map(|(name, elems)| {
                 BoxPlot::new(elems.to_vec())
-                    .name(name)
+                    .name(button_name)
                     .horizontal()
                     .element_formatter(Box::new(box_plot_formatter))
             })
             .collect();
 
-        // formatter for the x-axis
-        let x_fmt = |x: f64, _range: &RangeInclusive<f64>| f64_to_formatted_time(x);
+        ComboBox::from_label("Controller Type")
+            .selected_text(format!("{:?}", self.controller_type))
+            .show_ui(ui, |combo_ui| {
+                for controller_type in ControllerType::iter() {
+                    combo_ui.selectable_value(
+                        &mut self.controller_type,
+                        controller_type,
+                        format!("{:?}", controller_type),
+                    );
+                }
+            });
 
-        // formatter for the info displayed next to the cursor
-        let coord_fmt = |_string: &str, value: &Value| f64_to_formatted_time(value.x);
-
-        ui.horizontal(|ui| {
-            ui.checkbox(&mut self.show_date, "Show date");
-            ui.spacing();
-            ComboBox::from_label("Controller Type")
-                .selected_text(format!("{:?}", self.controller_type))
-                .show_ui(ui, |combo_ui| {
-                    for controller_type in ControllerType::iter() {
-                        combo_ui.selectable_value(
-                            &mut self.controller_type,
-                            controller_type,
-                            format!("{:?}", controller_type),
-                        );
-                    }
-                });
-        });
         Plot::new(self.plot_id.clone())
             .legend(Legend::default())
             .label_formatter(coord_fmt)
