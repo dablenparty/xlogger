@@ -1,54 +1,45 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use std::fs::File;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::thread;
+use std::process;
 
 use eframe::egui;
 use eframe::IconData;
 use human_panic::setup_panic;
 use image::ImageResult;
-use log::{error, info, LevelFilter};
+use log::{error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::button_graph::ControllerButtonGraph;
+use xlogger::gilrs_loop::GilrsEventLoop;
 use xlogger::stick_graph::ControllerStickGraph;
 use xlogger::util::{create_dir_if_not_exists, get_exe_parent_dir};
 use xlogger::{open_dialog_in_data_folder, BoxedResult, EguiView, StatefulText};
 
 #[derive(Default)]
 struct XloggerApp {
-    should_run: Arc<AtomicBool>,
     saved_text: StatefulText,
     stick_graphs: Vec<(bool, ControllerStickGraph)>,
     button_graphs: Vec<(bool, ControllerButtonGraph)>,
+    event_loop: GilrsEventLoop,
 }
 
 impl eframe::App for XloggerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            let should_run_value = self.should_run.load(Ordering::Relaxed);
+            let should_run_value = self.event_loop.is_recording();
             let text = if should_run_value { "Stop" } else { "Start" };
             ui.horizontal(|ui| {
                 if ui.button(text).clicked() {
                     let (log_message, saved_text) = if should_run_value {
+                        self.event_loop.set_recording(false);
                         ("stopped listening to controllers", "Saved!".to_owned())
                     } else {
                         // also starts the event loop thread
-                        {
-                            let should_run = self.should_run.clone();
-                            thread::spawn(move || {
-                                if let Err(e) = xlogger::listen_for_events(&should_run) {
-                                    error!("{:?}", e);
-                                    should_run.store(false, Ordering::Relaxed);
-                                }
-                            });
-                        };
+                        self.event_loop.set_recording(true);
                         ("started listening to controllers", "".to_owned())
                     };
                     self.saved_text.text = saved_text;
                     info!("{}", log_message);
-                    self.should_run.store(!should_run_value, Ordering::Relaxed);
                 }
                 self.saved_text.show(ui);
             });
@@ -149,12 +140,12 @@ fn main() {
         // do not allow the program to continue without logging
         panic!("Something went wrong initializing logging: {}", e);
     };
-    let should_run = Arc::new(AtomicBool::new(false));
 
-    let app = XloggerApp {
-        should_run,
-        ..XloggerApp::default()
-    };
+    let mut app = XloggerApp::default();
+    if let Err(e) = app.event_loop.listen_for_events() {
+        error!("{:?}", e);
+        process::exit(1);
+    }
     let native_options = match get_icon_data() {
         Ok(icon_data) => eframe::NativeOptions {
             icon_data: Some(icon_data),
@@ -162,7 +153,7 @@ fn main() {
         },
 
         Err(e) => {
-            error!("Failed to load icon with error: {}", e);
+            warn!("Failed to load icon with error: {}", e);
             eframe::NativeOptions::default()
         }
     };
