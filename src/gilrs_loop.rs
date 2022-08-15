@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -13,8 +14,8 @@ use log::{error, warn};
 
 use crate::{
     util::{create_dir_if_not_exists, get_exe_parent_dir},
-    BoxedResult, ControllerButtonEvent, ControllerConnectionEvent, ControllerStickEvent,
-    ControllerStickState, CrossbeamChannelPair,
+    ControllerButtonEvent, ControllerConnectionEvent, ControllerStickEvent, ControllerStickState,
+    CrossbeamChannelPair,
 };
 
 #[derive(Default)]
@@ -25,14 +26,28 @@ pub struct GilrsEventLoop {
     loop_handle: Option<JoinHandle<()>>,
 }
 
+#[derive(Debug, Clone)]
+pub enum GilrsEventLoopError {
+    NoLoopHandle,
+}
+
+impl fmt::Display for GilrsEventLoopError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            GilrsEventLoopError::NoLoopHandle => write!(f, "no event loop join handle"),
+        }
+    }
+}
+
+impl std::error::Error for GilrsEventLoopError {}
+
 impl GilrsEventLoop {
     /// Starts an event loop that listens for controller events and writes them to a file.
     ///
     /// This function is run on a separate thread.
-    pub fn listen_for_events(&mut self) -> BoxedResult<()> {
+    pub fn listen_for_events(&mut self) -> Result<(), GilrsEventLoopError> {
         if self.loop_handle.is_some() {
-            // TODO: custom error type
-            return Err("Event loop already running".into());
+            return Err(GilrsEventLoopError::NoLoopHandle);
         }
         self.should_run.store(true, Ordering::Relaxed);
         let should_run = self.should_run.clone();
