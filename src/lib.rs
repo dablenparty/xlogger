@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
+use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::time::SystemTime;
 
@@ -35,6 +36,31 @@ pub trait EguiView {
     ///
     /// * `ui` - The egui ui to use
     fn ui(&mut self, ui: &mut Ui);
+}
+
+/// A helper struct for working with a pair of MPSC sender & receiver channels
+pub struct MpscChannelPair<T> {
+    /// The sender channel
+    pub tx: mpsc::Sender<T>,
+    /// The receiver channel
+    pub rx: mpsc::Receiver<T>,
+}
+
+impl<T> Default for MpscChannelPair<T> {
+    fn default() -> Self {
+        let (tx, rx) = mpsc::channel::<T>();
+        Self { tx, rx }
+    }
+}
+
+/// Represents data for a controller connection event
+pub struct ControllerConnectionEvent {
+    /// `true` if the controller is connected, `false` otherwise
+    pub connected: bool,
+    /// The controller ID
+    pub controller_id: gilrs::GamepadId,
+    /// The controller name
+    pub gamepad_name: String,
 }
 
 /// Represents a controller button event
