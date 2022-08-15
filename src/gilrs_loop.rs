@@ -56,7 +56,7 @@ impl GilrsEventLoop {
         let should_record = self.should_record.clone();
         let channels = self.channels.clone();
         self.loop_handle = Some(thread::spawn(move || {
-            if let Err(e) = inner_listen(should_run, should_record, channels) {
+            if let Err(e) = inner_listen(&should_run, &should_record, &channels) {
                 error!("{:?}", e);
             }
         }));
@@ -110,9 +110,9 @@ fn make_csv_writers() -> io::Result<(csv::Writer<File>, csv::Writer<File>)> {
 }
 
 fn inner_listen(
-    should_run: Arc<AtomicBool>,
-    should_record: Arc<AtomicBool>,
-    channels: CrossbeamChannelPair<ControllerConnectionEvent>,
+    should_run: &Arc<AtomicBool>,
+    should_record: &Arc<AtomicBool>,
+    channels: &CrossbeamChannelPair<ControllerConnectionEvent>,
 ) -> io::Result<()> {
     // if this fails, the event loop can never run
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");

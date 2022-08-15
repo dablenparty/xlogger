@@ -95,7 +95,7 @@ impl eframe::App for XloggerApp {
                     "Connected controllers: {}",
                     self.connected_controllers.len()
                 ));
-                for e in self.connected_controllers.iter() {
+                for e in &self.connected_controllers {
                     ui.label(format!("[{}] {}", e.controller_id, e.gamepad_name));
                 }
             });
