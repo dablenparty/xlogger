@@ -13,6 +13,7 @@ use xlogger::button_graph::ControllerButtonGraph;
 use xlogger::gilrs_loop::GilrsEventLoop;
 use xlogger::stick_graph::ControllerStickGraph;
 use xlogger::util::{create_dir_if_not_exists, get_exe_parent_dir};
+use xlogger::ControllerConnectionEvent;
 use xlogger::{open_dialog_in_data_folder, BoxedResult, EguiView, StatefulText};
 
 #[derive(Default)]
@@ -21,6 +22,7 @@ struct XloggerApp {
     stick_graphs: Vec<(bool, ControllerStickGraph)>,
     button_graphs: Vec<(bool, ControllerButtonGraph)>,
     event_loop: GilrsEventLoop,
+    connected_controllers: Vec<ControllerConnectionEvent>,
 }
 
 impl eframe::App for XloggerApp {
@@ -66,6 +68,24 @@ impl eframe::App for XloggerApp {
                             self.button_graphs.push((true, graph));
                         }
                     }
+                }
+            });
+            // TODO: make event type an enum, highlight controller in list on input
+            for e in self.event_loop.channels.rx.try_iter() {
+                if e.connected {
+                    self.connected_controllers.push(e);
+                } else {
+                    self.connected_controllers
+                        .retain(|c| c.controller_id != e.controller_id);
+                }
+            }
+            ui.vertical(|ui| {
+                ui.label(format!(
+                    "Connection controllers: {}",
+                    self.connected_controllers.len()
+                ));
+                for e in self.connected_controllers.iter() {
+                    ui.label(format!("[{}] {}", e.controller_id, e.gamepad_name));
                 }
             });
             self.stick_graphs
