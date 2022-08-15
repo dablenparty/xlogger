@@ -7,9 +7,7 @@ use eframe::egui::{
 use log::info;
 use strum::IntoEnumIterator;
 
-use crate::{
-    util::f64_to_formatted_time, BoxedResult, ControllerButtonEvent, ControllerType, EguiView,
-};
+use crate::{util::f64_to_formatted_time, ControllerButtonEvent, ControllerType, EguiView};
 
 pub struct ControllerButtonGraph {
     csv_data: Option<HashMap<gilrs::Button, Vec<ControllerButtonEvent>>>,
@@ -39,12 +37,12 @@ impl ControllerButtonGraph {
     /// # Errors
     ///
     /// This function will return an error if the CSV data is invalid or not found.
-    pub fn load(&mut self, data_path: PathBuf) -> BoxedResult<()> {
+    pub fn load(&mut self, data_path: PathBuf) -> Result<(), csv::Error> {
         info!("loading button data from {}", data_path.display());
         let data = csv::Reader::from_path(&data_path)?
             .deserialize::<ControllerButtonEvent>()
-            .try_fold::<_, _, BoxedResult<HashMap<gilrs::Button, Vec<ControllerButtonEvent>>>>(
-                HashMap::new(),
+            .try_fold::<_, _, Result<_, csv::Error>>(
+                HashMap::<gilrs::Button, Vec<ControllerButtonEvent>>::new(),
                 |mut acc, result| {
                     let event = result?;
                     acc.entry(event.button).or_insert_with(Vec::new).push(event);
