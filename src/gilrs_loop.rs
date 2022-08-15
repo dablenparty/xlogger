@@ -177,10 +177,7 @@ fn inner_listen(
                     }
                 }
                 EventType::Connected | EventType::Disconnected => {
-                    let connected = match event {
-                        EventType::Connected => true,
-                        _ => false,
-                    };
+                    let connected = matches!(event, EventType::Connected);
                     let gamepad_name = gilrs.gamepad(gamepad_id).name().to_string();
                     let connection_event = ControllerConnectionEvent {
                         connected,
