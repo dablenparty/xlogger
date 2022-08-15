@@ -1,22 +1,21 @@
 use std::{collections::HashMap, ffi::OsStr, ops::RangeInclusive, path::PathBuf};
 
-use chrono::{DateTime, NaiveDateTime, Utc};
 use eframe::egui::{
-    plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot},
-    Context, Ui, Window,
+    plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot, Value},
+    ComboBox, Context, Ui, Window,
 };
 use log::info;
+use strum::IntoEnumIterator;
 
-use crate::{BoxedResult, ControllerButtonEvent, EguiView};
-
-const DATETIME_FORMAT: &str = "%b %e, %Y %H:%M:%S";
-const TIME_FORMAT: &str = "%H:%M:%S";
+use crate::{
+    util::f64_to_formatted_time, BoxedResult, ControllerButtonEvent, ControllerType, EguiView,
+};
 
 pub struct ControllerButtonGraph {
-    csv_data: Option<HashMap<String, Vec<BoxElem>>>,
+    csv_data: Option<HashMap<gilrs::Button, Vec<ControllerButtonEvent>>>,
     data_path: Option<PathBuf>,
     plot_id: String,
-    show_date: bool,
+    controller_type: ControllerType,
 }
 
 impl Default for ControllerButtonGraph {
@@ -24,7 +23,7 @@ impl Default for ControllerButtonGraph {
         Self {
             csv_data: None,
             data_path: None,
-            show_date: false,
+            controller_type: ControllerType::default(),
             plot_id: uuid::Uuid::new_v4().to_string(),
         }
     }
@@ -42,41 +41,13 @@ impl ControllerButtonGraph {
     /// This function will return an error if the CSV data is invalid or not found.
     pub fn load(&mut self, data_path: PathBuf) -> BoxedResult<()> {
         info!("loading button data from {}", data_path.display());
-        // TODO: move element construction to ui function
         let data = csv::Reader::from_path(&data_path)?
             .deserialize::<ControllerButtonEvent>()
-            .try_fold::<_, _, BoxedResult<HashMap<String, Vec<BoxElem>>>>(
+            .try_fold::<_, _, BoxedResult<HashMap<gilrs::Button, Vec<ControllerButtonEvent>>>>(
                 HashMap::new(),
                 |mut acc, result| {
                     let event = result?;
-                    let duration = event.release_time - event.press_time;
-                    let as_datetime = DateTime::<Utc>::from_utc(
-                        NaiveDateTime::from_timestamp(event.press_time as i64, 0),
-                        Utc,
-                    );
-                    let elem_name = format!(
-                        "Button: {}\nPressed at: {}\nHeld for: {:.2}s",
-                        event.button_name,
-                        as_datetime.format(DATETIME_FORMAT),
-                        duration
-                    );
-                    let box_elem = BoxElem::new(
-                        0.5,
-                        BoxSpread::new(
-                            event.press_time,
-                            event.press_time,
-                            event.press_time,
-                            event.release_time,
-                            event.release_time,
-                        ),
-                    )
-                    .whisker_width(0.0)
-                    .name(elem_name);
-                    if let Some(vec) = acc.get_mut(&event.button_name) {
-                        vec.push(box_elem);
-                    } else {
-                        acc.insert(event.button_name, vec![box_elem]);
-                    }
+                    acc.entry(event.button).or_insert_with(Vec::new).push(event);
                     Ok(acc)
                 },
             )?;
@@ -111,41 +82,66 @@ impl EguiView for ControllerButtonGraph {
             return;
         }
         let data = self.csv_data.as_ref().unwrap();
+
+        // format info displayed when hovering over a bar
+        let box_plot_formatter = |elem: &BoxElem, _plot: &BoxPlot| elem.name.clone();
+
+        // formatter for the x-axis
+        let x_fmt = |x: f64, _range: &RangeInclusive<f64>| f64_to_formatted_time(x);
+
+        // formatter for the info displayed next to the cursor
+        let coord_fmt = |_string: &str, value: &Value| f64_to_formatted_time(value.x);
+
         let box_plots: Vec<BoxPlot> = data
             .iter()
             .enumerate()
-            .map(|(i, (key, vec))| {
-                let mapped_boxes: Vec<BoxElem> = vec
+            .map(|(i, (button, events))| {
+                let button_name = self.controller_type.get_button_name(*button);
+                let elems: Vec<BoxElem> = events
                     .iter()
-                    .cloned()
-                    .map(|mut e| {
-                        e.argument = i as f64;
-                        e
+                    .map(|e| {
+                        let duration = e.release_time - e.press_time;
+                        let pressed_at_string = f64_to_formatted_time(e.press_time);
+                        let elem_name = format!(
+                            "Button: {}\nPressed at: {}\nHeld for: {:.2}s",
+                            button_name, pressed_at_string, duration
+                        );
+                        BoxElem::new(
+                            (i + 1) as f64,
+                            BoxSpread::new(
+                                e.press_time,
+                                e.press_time,
+                                e.press_time,
+                                e.release_time,
+                                e.release_time,
+                            ),
+                        )
+                        .name(elem_name)
+                        .whisker_width(0.0)
                     })
                     .collect();
-                let formatter = |elem: &BoxElem, _plot: &BoxPlot| elem.name.clone();
-                BoxPlot::new(mapped_boxes)
-                    .name(key)
+                BoxPlot::new(elems.to_vec())
+                    .name(button_name)
                     .horizontal()
-                    .element_formatter(Box::new(formatter))
+                    .element_formatter(Box::new(box_plot_formatter))
             })
             .collect();
 
-        let format = if self.show_date {
-            DATETIME_FORMAT
-        } else {
-            TIME_FORMAT
-        };
-        let x_fmt = |x: f64, _range: &RangeInclusive<f64>| {
-            // format to datetime string
-            let datetime =
-                DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(x as i64, 0), Utc);
-            datetime.format(format).to_string()
-        };
+        ComboBox::from_label("Controller Type")
+            .selected_text(format!("{:?}", self.controller_type))
+            .show_ui(ui, |combo_ui| {
+                for controller_type in ControllerType::iter() {
+                    combo_ui.selectable_value(
+                        &mut self.controller_type,
+                        controller_type,
+                        format!("{:?}", controller_type),
+                    );
+                }
+            });
 
-        ui.checkbox(&mut self.show_date, "Show date");
         Plot::new(self.plot_id.clone())
             .legend(Legend::default())
+            .label_formatter(coord_fmt)
             .x_axis_formatter(x_fmt)
             .show_axes([true, false])
             .show(ui, |plot_ui| {

@@ -9,6 +9,7 @@ use eframe::epaint::Color32;
 use gilrs::{Axis, Gilrs};
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
+use strum::EnumIter;
 
 use crate::util::{create_dir_if_not_exists, get_exe_parent_dir};
 
@@ -45,7 +46,7 @@ pub struct ControllerButtonEvent {
     /// When the button was released
     pub release_time: f64,
     /// The button that was pressed
-    pub button_name: String,
+    pub button: gilrs::Button,
 }
 
 /// Represents a controller stick event. This struct tracks both sticks at once.
@@ -125,6 +126,8 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
     let mut left_stick_state = ControllerStickState::default();
     let mut right_stick_state = ControllerStickState::default();
 
+    let start_time = SystemTime::now();
+
     while should_run.load(std::sync::atomic::Ordering::Relaxed) {
         while let Some(gilrs::Event {
             event,
@@ -145,7 +148,7 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
                     }
                     let stick_event = ControllerStickEvent {
                         time: event_time
-                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .duration_since(start_time)
                             .expect("time went backwards!")
                             .as_secs_f64(),
                         left_x: left_stick_state.x,
@@ -159,26 +162,30 @@ pub fn listen_for_events(should_run: &Arc<AtomicBool>) -> io::Result<()> {
                             stick_event, e
                         );
                     }
+                    stick_csv_writer.flush()?;
                 }
                 gilrs::EventType::ButtonChanged(button, value, ..) => {
                     let name = format!("{:?}", button);
 
                     if value == 0.0 {
                         let down_time = time_map.remove(&name).unwrap_or_else(SystemTime::now);
-                        // expect is used here because the time should never be before the epoch
-                        // if it is, something bigger is wrong
                         let button_event = ControllerButtonEvent {
                             press_time: down_time
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("time was before the epoch!")
+                                .duration_since(start_time)
+                                .expect("time went backwards!")
                                 .as_secs_f64(),
                             release_time: event_time
-                                .duration_since(SystemTime::UNIX_EPOCH)
-                                .expect("time was before the epoch!")
+                                .duration_since(start_time)
+                                .expect("time went backwards!")
                                 .as_secs_f64(),
-                            button_name: name.clone(),
+                            button,
                         };
-                        button_csv_writer.serialize(&button_event)?;
+                        if let Err(e) = button_csv_writer.serialize(&button_event) {
+                            error!(
+                                "failed to write button event <{:?}> to csv with following error: {:?}",
+                                button_event, e
+                            );
+                        }
                         button_csv_writer.flush()?;
                     } else {
                         // only insert if it doesn't have a value (aka has the default value)
@@ -271,5 +278,69 @@ impl StatefulText {
             TextState::Default => self.default_color,
         };
         ui.colored_label(color, &self.text);
+    }
+}
+
+#[repr(u16)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, EnumIter)]
+pub enum ControllerType {
+    Default = 1,
+    Xbox = 2,
+    PlayStation = 3,
+}
+
+impl Default for ControllerType {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+impl ControllerType {
+    /// Returns the name of the button based on its `ControllerType`.
+    ///
+    /// # Arguments
+    ///
+    /// * `button`: The button to get the name of.
+    ///
+    /// returns: `String`
+    pub fn get_button_name(&self, button: gilrs::Button) -> String {
+        match self {
+            ControllerType::Default => format!("{:?}", button),
+            ControllerType::Xbox => get_xbox_button(button),
+            ControllerType::PlayStation => get_playstation_button(button),
+        }
+    }
+}
+
+fn get_xbox_button(button: gilrs::Button) -> String {
+    match button {
+        gilrs::Button::South => "A".to_string(),
+        gilrs::Button::East => "B".to_string(),
+        gilrs::Button::North => "Y".to_string(),
+        gilrs::Button::West => "X".to_string(),
+        gilrs::Button::LeftTrigger => "LB".to_string(),
+        gilrs::Button::LeftTrigger2 => "LT".to_string(),
+        gilrs::Button::RightTrigger => "RB".to_string(),
+        gilrs::Button::RightTrigger2 => "RT".to_string(),
+        gilrs::Button::LeftThumb => "LS".to_string(),
+        gilrs::Button::RightThumb => "RS".to_string(),
+        _ => format!("{:?}", button),
+    }
+}
+
+fn get_playstation_button(button: gilrs::Button) -> String {
+    // TODO: use symbols
+    match button {
+        gilrs::Button::South => "X".to_string(),
+        gilrs::Button::East => "O".to_string(),
+        gilrs::Button::North => "Triangle".to_string(),
+        gilrs::Button::West => "Square".to_string(),
+        gilrs::Button::LeftTrigger => "L1".to_string(),
+        gilrs::Button::LeftTrigger2 => "L2".to_string(),
+        gilrs::Button::RightTrigger => "R1".to_string(),
+        gilrs::Button::RightTrigger2 => "R2".to_string(),
+        gilrs::Button::LeftThumb => "LS".to_string(),
+        gilrs::Button::RightThumb => "RS".to_string(),
+        _ => format!("{:?}", button),
     }
 }
