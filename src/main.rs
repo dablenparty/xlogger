@@ -26,6 +26,12 @@ struct XloggerApp {
 }
 
 impl eframe::App for XloggerApp {
+    fn on_exit(&mut self, _gl: &eframe::glow::Context) {
+        // TODO: confirm exit if event loop is recording
+        info!("Closing GILRS event loop");
+        self.event_loop.stop_listening();
+    }
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             if !self.event_loop.is_running() {
