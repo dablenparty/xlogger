@@ -5,7 +5,7 @@ use eframe::epaint::Color32;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
-use crate::util::{get_exe_parent_dir};
+use crate::util::get_exe_parent_dir;
 
 pub mod button_graph;
 pub mod gilrs_loop;
@@ -58,6 +58,7 @@ impl<T> Default for CrossbeamChannelPair<T> {
 }
 
 /// Represents data for a controller connection event
+#[derive(Debug, Clone)]
 pub struct ControllerConnectionEvent {
     /// `true` if the controller is connected, `false` otherwise
     pub connected: bool,
