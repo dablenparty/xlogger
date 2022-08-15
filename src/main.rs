@@ -28,6 +28,11 @@ struct XloggerApp {
 impl eframe::App for XloggerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            if !self.event_loop.is_running() {
+                egui::Window::new("Critical Error").title_bar(true).show(ctx, |ui| {
+                    StatefulText::new("The GILRS event loop is not running. Please restart the application.\n\nIf the issue persists, check the logs for more information.".to_string(), xlogger::TextState::Error).show(ui);
+                });
+            }
             let should_run_value = self.event_loop.is_recording();
             let text = if should_run_value { "Stop" } else { "Start" };
             ui.horizontal(|ui| {
@@ -81,7 +86,7 @@ impl eframe::App for XloggerApp {
             }
             ui.vertical(|ui| {
                 ui.label(format!(
-                    "Connection controllers: {}",
+                    "Connected controllers: {}",
                     self.connected_controllers.len()
                 ));
                 for e in self.connected_controllers.iter() {

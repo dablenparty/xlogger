@@ -84,7 +84,7 @@ impl GilrsEventLoop {
         self.should_record.store(false, Ordering::Relaxed);
         self.should_run.store(false, Ordering::Relaxed);
         if let Err(e) = self.loop_handle.take().unwrap().join() {
-            warn!("{:?}", e);
+            error!("{:?}", e);
         }
     }
 }
