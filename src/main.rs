@@ -212,6 +212,15 @@ fn main() {
         error!("{:?}", e);
         process::exit(1);
     }
+    // loads initial controllers into UI on first render
+    if let Err(e) = app
+        .event_loop
+        .event_channels
+        .tx
+        .send(xlogger::gilrs_loop::GilrsEventLoopEvent::GetAllControllers)
+    {
+        error!("{:?}", e);
+    }
     let native_options = match get_icon_data() {
         Ok(icon_data) => eframe::NativeOptions {
             icon_data: Some(icon_data),

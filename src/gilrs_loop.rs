@@ -12,7 +12,7 @@ use std::{
 };
 
 use gilrs::{Axis, EventType, Gilrs};
-use log::{error, warn};
+use log::{debug, error, warn};
 
 use crate::{
     util::{create_dir_if_not_exists, get_exe_parent_dir},
@@ -20,9 +20,16 @@ use crate::{
     CrossbeamChannelPair,
 };
 
+// TODO: use to replace starting/stopping recording, possibly the the event loop altogether
+#[derive(Debug)]
+pub enum GilrsEventLoopEvent {
+    GetAllControllers,
+}
+
 #[derive(Default)]
 pub struct GilrsEventLoop {
     pub channels: CrossbeamChannelPair<ControllerConnectionEvent>,
+    pub event_channels: CrossbeamChannelPair<GilrsEventLoopEvent>,
     should_record: Arc<AtomicBool>,
     should_run: Arc<AtomicBool>,
     loop_handle: Option<JoinHandle<()>>,
@@ -55,8 +62,9 @@ impl GilrsEventLoop {
         let should_run = self.should_run.clone();
         let should_record = self.should_record.clone();
         let channels = self.channels.clone();
+        let event_channels = self.event_channels.clone();
         self.loop_handle = Some(thread::spawn(move || {
-            if let Err(e) = inner_listen(&should_run, &should_record, &channels) {
+            if let Err(e) = inner_listen(&should_run, &should_record, &channels, &event_channels) {
                 error!("{:?}", e);
             }
         }));
@@ -113,23 +121,13 @@ fn inner_listen(
     should_run: &Arc<AtomicBool>,
     should_record: &Arc<AtomicBool>,
     channels: &CrossbeamChannelPair<ControllerConnectionEvent>,
+    event_channels: &CrossbeamChannelPair<GilrsEventLoopEvent>,
 ) -> io::Result<()> {
     // if this fails, the event loop can never run
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
     // loads any currently connected controllers into the UI
-    gilrs.gamepads().for_each(|(id, gamepad)| {
-        if let Err(e) = channels.tx.send(ControllerConnectionEvent {
-            connected: true,
-            controller_id: id,
-            gamepad_name: gamepad.name().to_string(),
-        }) {
-            warn!(
-                "Error sending controller connection to main thread: {:?}",
-                e
-            );
-        }
-    });
 
+    // TODO: make dedicated writer thread using a crossbeam queue
     // csv writers
     let mut writers: Option<(csv::Writer<File>, csv::Writer<File>)> = None;
 
@@ -144,6 +142,26 @@ fn inner_listen(
     let mut last_record = should_record.load(Ordering::Relaxed);
 
     while should_run.load(Ordering::Relaxed) {
+        // get events
+        for next_event in event_channels.rx.try_iter() {
+            debug!("got event: {:?}", next_event);
+            match next_event {
+                GilrsEventLoopEvent::GetAllControllers => {
+                    gilrs.gamepads().for_each(|(id, gamepad)| {
+                        if let Err(e) = channels.tx.send(ControllerConnectionEvent {
+                            connected: true,
+                            controller_id: id,
+                            gamepad_name: gamepad.name().to_string(),
+                        }) {
+                            warn!(
+                                "Error sending controller connection to main thread: {:?}",
+                                e
+                            );
+                        }
+                    });
+                }
+            }
+        }
         let should_record = should_record.load(Ordering::Relaxed);
         if !last_record && should_record {
             if writers.is_some() {
