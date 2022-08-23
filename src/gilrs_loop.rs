@@ -24,13 +24,14 @@ use crate::{
 #[derive(Debug)]
 pub enum GilrsEventLoopEvent {
     GetAllControllers,
+    StartRecording,
+    StopRecording,
 }
 
 #[derive(Default)]
 pub struct GilrsEventLoop {
     pub channels: CrossbeamChannelPair<ControllerConnectionEvent>,
     pub event_channels: CrossbeamChannelPair<GilrsEventLoopEvent>,
-    should_record: Arc<AtomicBool>,
     should_run: Arc<AtomicBool>,
     loop_handle: Option<JoinHandle<()>>,
 }
@@ -160,7 +161,7 @@ impl WriterThread {
         Ok(())
     }
 
-    /// Stops the writer thread.
+    /// Stops the writer thread. This will block until the thread has exited and is safe to call if the thread is not running.
     ///
     /// If an error occurs while stopping the thread, it is logged but the error is not returned.
     fn stop(&mut self) {
@@ -171,7 +172,6 @@ impl WriterThread {
         if let Err(e) = self.thread_handle.take().unwrap().join() {
             error!("failed to join writer thread with following error: {:?}", e);
         }
-        self.thread_handle = None;
     }
 }
 
@@ -200,20 +200,12 @@ impl GilrsEventLoop {
         }
         self.should_run.store(true, Ordering::Relaxed);
         let should_run = self.should_run.clone();
-        let should_record = self.should_record.clone();
         let channels = self.channels.clone();
         let event_channels = self.event_channels.clone();
         self.loop_handle = Some(thread::spawn(move || {
-            if let Err(e) = inner_listen(&should_run, &should_record, &channels, &event_channels) {
-                error!("{:?}", e);
-            }
+            inner_listen(&should_run, &channels, &event_channels);
         }));
         Ok(())
-    }
-
-    /// Sets whether the event loop should record button/stick events.
-    pub fn set_recording(&self, should_record: bool) {
-        self.should_record.store(should_record, Ordering::Relaxed);
     }
 
     /// Returns whether the event loop is currently running.
@@ -221,17 +213,11 @@ impl GilrsEventLoop {
         self.loop_handle.is_some() && self.should_run.load(Ordering::Relaxed)
     }
 
-    /// Returns whether the event loop is currently recording button/stick events.
-    pub fn is_recording(&self) -> bool {
-        self.is_running() && self.should_record.load(Ordering::Relaxed)
-    }
-
     /// Stops the event loop. This will block until the event loop has stopped.
     pub fn stop_listening(&mut self) {
         if self.loop_handle.is_none() || !self.is_running() {
             return;
         }
-        self.should_record.store(false, Ordering::Relaxed);
         self.should_run.store(false, Ordering::Relaxed);
         if let Err(e) = self.loop_handle.take().unwrap().join() {
             error!("{:?}", e);
@@ -259,14 +245,11 @@ fn make_csv_writers() -> io::Result<(csv::Writer<File>, csv::Writer<File>)> {
 
 fn inner_listen(
     should_run: &Arc<AtomicBool>,
-    should_record: &Arc<AtomicBool>,
     channels: &CrossbeamChannelPair<ControllerConnectionEvent>,
     event_channels: &CrossbeamChannelPair<GilrsEventLoopEvent>,
-) -> io::Result<()> {
+) {
     // if this fails, the event loop can never run
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
-
-    let mut last_record = should_record.load(Ordering::Relaxed);
 
     let mut writer_thread = WriterThread::default();
 
@@ -289,15 +272,14 @@ fn inner_listen(
                         }
                     });
                 }
+                GilrsEventLoopEvent::StartRecording => {
+                    if let Err(e) = writer_thread.start() {
+                        warn!("Error starting writer thread: {:?}", e);
+                    }
+                }
+                GilrsEventLoopEvent::StopRecording => writer_thread.stop(),
             }
         }
-        let should_record = should_record.load(Ordering::Relaxed);
-        if !last_record && should_record {
-            writer_thread.start()?;
-        } else if last_record && !should_record {
-            writer_thread.stop();
-        }
-        last_record = should_record;
         while let Some(event) = gilrs.next_event() {
             let gilrs::Event {
                 event: event_type,
@@ -305,7 +287,9 @@ fn inner_listen(
                 ..
             } = event;
             match event_type {
-                EventType::AxisChanged(..) | EventType::ButtonChanged(..) if should_record => {
+                EventType::AxisChanged(..) | EventType::ButtonChanged(..)
+                    if writer_thread.thread_handle.is_some() =>
+                {
                     if let Err(e) = writer_thread.channels.tx.send(event) {
                         warn!("Error sending event to writer thread: {:?}", e);
                     }
@@ -329,5 +313,6 @@ fn inner_listen(
             }
         }
     }
-    Ok(())
+    // stop the writer thread
+    writer_thread.stop();
 }

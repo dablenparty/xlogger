@@ -11,6 +11,7 @@ use log::{error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::button_graph::ControllerButtonGraph;
 use xlogger::gilrs_loop::GilrsEventLoop;
+use xlogger::gilrs_loop::GilrsEventLoopEvent;
 use xlogger::stick_graph::ControllerStickGraph;
 use xlogger::util::{create_dir_if_not_exists, get_exe_parent_dir};
 use xlogger::ControllerConnectionEvent;
@@ -23,6 +24,7 @@ struct XloggerApp {
     button_graphs: Vec<(bool, ControllerButtonGraph)>,
     event_loop: GilrsEventLoop,
     connected_controllers: Vec<ControllerConnectionEvent>,
+    event_loop_is_recording: bool,
 }
 
 impl eframe::App for XloggerApp {
@@ -39,16 +41,20 @@ impl eframe::App for XloggerApp {
                     StatefulText::new("The GILRS event loop is not running. Please restart the application.\n\nIf the issue persists, check the logs for more information.".to_string(), xlogger::TextState::Error).show(ui);
                 });
             }
-            let should_run_value = self.event_loop.is_recording();
-            let text = if should_run_value { "Stop" } else { "Start" };
+            let text = if self.event_loop_is_recording { "Stop" } else { "Start" };
             ui.horizontal(|ui| {
                 if ui.button(text).clicked() {
-                    let (log_message, saved_text) = if should_run_value {
-                        self.event_loop.set_recording(false);
+                    let (log_message, saved_text) = if self.event_loop_is_recording {
+                        self.event_loop_is_recording = false;
+                        if let Err(e) = self.event_loop.event_channels.tx.send(GilrsEventLoopEvent::StopRecording) {
+                            error!("Failed to send stop recording event: {:?}", e);
+                        }
                         ("stopped listening to controllers", "Saved!".to_owned())
                     } else {
-                        // also starts the event loop thread
-                        self.event_loop.set_recording(true);
+                        self.event_loop_is_recording = true;
+                        if let Err(e) = self.event_loop.event_channels.tx.send(GilrsEventLoopEvent::StartRecording) {
+                            error!("Failed to send start recording event: {:?}", e);
+                        }
                         ("started listening to controllers", "".to_owned())
                     };
                     self.saved_text.text = saved_text;
@@ -217,7 +223,7 @@ fn main() {
         .event_loop
         .event_channels
         .tx
-        .send(xlogger::gilrs_loop::GilrsEventLoopEvent::GetAllControllers)
+        .send(GilrsEventLoopEvent::GetAllControllers)
     {
         error!("{:?}", e);
     }
