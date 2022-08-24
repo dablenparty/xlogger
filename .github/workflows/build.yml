@@ -1,13 +1,16 @@
 name: Rust
 
-on: [ push ]
+on:
+  push:
+    paths-ignore:
+      - "LICENSE"
+      - "README.md"
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     # as of right now, this application only supports Windows
     runs-on: windows-latest
 
