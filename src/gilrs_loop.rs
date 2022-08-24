@@ -86,10 +86,10 @@ impl WriterThread {
                     match event {
                         EventType::AxisChanged(axis, value, ..) => {
                             match axis {
-                                Axis::LeftStickX => left_stick_state.x = value,
-                                Axis::LeftStickY => left_stick_state.y = value,
-                                Axis::RightStickX => right_stick_state.x = value,
-                                Axis::RightStickY => right_stick_state.y = value,
+                                Axis::LeftStickX => left_stick_state.x = value as f64,
+                                Axis::LeftStickY => left_stick_state.y = value as f64,
+                                Axis::RightStickX => right_stick_state.x = value as f64,
+                                Axis::RightStickY => right_stick_state.y = value as f64,
                                 _ => {
                                     warn!("unhandled axis event: {:?}", event);
                                     continue;

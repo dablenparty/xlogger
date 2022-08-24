@@ -87,22 +87,22 @@ pub struct ControllerStickEvent {
     /// The time at which the event occurred.
     pub time: f64,
     /// The x-axis value of the left stick.
-    pub left_x: f32,
+    pub left_x: f64,
     /// The y-axis value of the left stick.
-    pub left_y: f32,
+    pub left_y: f64,
     /// The x-axis value of the right stick.
-    pub right_x: f32,
+    pub right_x: f64,
     /// The y-axis value of the right stick.
-    pub right_y: f32,
+    pub right_y: f64,
 }
 
 /// Represents the state of a dual-stick controller.
 #[derive(Debug, Default)]
 struct ControllerStickState {
     /// The x-axis value of the stick.
-    x: f32,
+    x: f64,
     /// The y-axis value of the stick.
-    y: f32,
+    y: f64,
 }
 
 /// Opens a file dialog to the applications data folder.
