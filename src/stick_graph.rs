@@ -6,7 +6,7 @@ use eframe::egui::{
 };
 use log::{info, warn};
 
-use crate::{BoxedResult, ControllerStickEvent, EguiView};
+use crate::{ControllerStickEvent, EguiView};
 
 #[derive(Clone)]
 struct ControllerStickData {
@@ -46,12 +46,12 @@ impl ControllerStickGraph {
     /// # Errors
     ///
     /// This function will return an error if the CSV data is invalid or not found.
-    pub fn load(&mut self, data_path: PathBuf) -> BoxedResult<()> {
+    pub fn load(&mut self, data_path: PathBuf) -> Result<(), csv::Error> {
         info!("Loading stick data from {}", data_path.display());
         let (ls_events, rs_events) = csv::Reader::from_path(&data_path)?
             .deserialize::<ControllerStickEvent>()
-            .try_fold::<_, _, BoxedResult<(Vec<Value>, Vec<Value>)>>(
-                (Vec::new(), Vec::new()),
+            .try_fold::<_, _, Result<_, csv::Error>>(
+                (Vec::<Value>::new(), Vec::<Value>::new()),
                 |mut acc, result| {
                     let event = result?;
                     acc.0.push(Value::new(event.left_x, event.left_y));

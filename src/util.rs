@@ -59,8 +59,8 @@ pub fn f64_to_formatted_time(secs: f64) -> String {
         datetime,
         secs.fract()
             .to_string()
-            .split_once(".")
-            .unwrap_or_else(|| ("0", "0"))
+            .split_once('.')
+            .unwrap_or(("0", "0"))
             .1
     )
 }
