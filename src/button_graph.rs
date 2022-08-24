@@ -118,7 +118,7 @@ impl EguiView for ControllerButtonGraph {
                         .whisker_width(0.0)
                     })
                     .collect();
-                BoxPlot::new(elems.clone())
+                BoxPlot::new(elems)
                     .name(button_name)
                     .horizontal()
                     .element_formatter(Box::new(box_plot_formatter))
