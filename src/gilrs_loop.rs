@@ -20,7 +20,6 @@ use crate::{
     CrossbeamChannelPair,
 };
 
-// TODO: use to replace starting/stopping recording, possibly the the event loop altogether
 #[derive(Debug)]
 pub enum GilrsEventLoopEvent {
     GetAllControllers,
@@ -276,7 +275,7 @@ fn inner_listen(
                             controller_id: id,
                             gamepad_name: gamepad.name().to_string(),
                         }) {
-                            warn!(
+                            error!(
                                 "Error sending controller connection to main thread: {:?}",
                                 e
                             );
@@ -285,16 +284,16 @@ fn inner_listen(
                 }
                 GilrsEventLoopEvent::StartRecording => {
                     for (gamepad_id, writer_thread) in &mut writer_thread_map {
-                        info!("starting recording for gamepad {:?}", gamepad_id);
                         if let Err(e) = writer_thread.start() {
                             warn!("Error starting writer thread: {:?}", e);
                         }
+                        info!("started recording gamepad {}", gamepad_id);
                     }
                 }
                 GilrsEventLoopEvent::StopRecording => {
                     for (gamepad_id, writer_thread) in &mut writer_thread_map {
-                        info!("stopping recording for gamepad {:?}", gamepad_id);
                         writer_thread.stop();
+                        info!("stopped recording gamepad {}", gamepad_id);
                     }
                 }
             }
