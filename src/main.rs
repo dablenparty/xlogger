@@ -10,8 +10,8 @@ use image::ImageResult;
 use log::{error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::button_graph::ControllerButtonGraph;
-use xlogger::gilrs_loop::GilrsEventLoop;
 use xlogger::gilrs_loop::GELEvent;
+use xlogger::gilrs_loop::GilrsEventLoop;
 use xlogger::stick_graph::ControllerStickGraph;
 use xlogger::util::{create_dir_if_not_exists, get_exe_parent_dir};
 use xlogger::ControllerConnectionEvent;
@@ -28,7 +28,7 @@ struct XloggerApp {
 }
 
 impl eframe::App for XloggerApp {
-    fn on_exit(&mut self, _gl: &eframe::glow::Context) {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         // TODO: confirm exit if event loop is recording
         info!("Closing GILRS event loop");
         self.event_loop.stop_listening();
