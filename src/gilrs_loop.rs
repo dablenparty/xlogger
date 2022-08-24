@@ -12,7 +12,7 @@ use std::{
 };
 
 use gilrs::{Axis, EventType, Gilrs};
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 
 use crate::{
     util::{create_dir_if_not_exists, get_exe_parent_dir},
@@ -47,6 +47,8 @@ struct WriterThread {
     channels: CrossbeamChannelPair<gilrs::Event>,
     /// Join handle for the thread. This is None if the thread is not running.
     thread_handle: Option<JoinHandle<()>>,
+    /// Prefix for the file names.
+    file_name_prefix: String,
 }
 
 impl WriterThread {
@@ -58,7 +60,8 @@ impl WriterThread {
     ///
     /// Returns `io::Error` if one occurs while creating the CSV writers.
     fn start(&mut self) -> io::Result<()> {
-        let (mut button_csv_writer, mut stick_csv_writer) = make_csv_writers()?;
+        let (mut button_csv_writer, mut stick_csv_writer) =
+            make_csv_writers(self.file_name_prefix.clone())?;
 
         let mut time_map: HashMap<gilrs::GamepadId, SystemTime> = HashMap::new();
 
@@ -225,7 +228,7 @@ impl GilrsEventLoop {
     }
 }
 
-fn make_csv_writers() -> io::Result<(csv::Writer<File>, csv::Writer<File>)> {
+fn make_csv_writers(prefix: String) -> io::Result<(csv::Writer<File>, csv::Writer<File>)> {
     let data_folder = get_exe_parent_dir().join("data");
     create_dir_if_not_exists(&data_folder)?;
     let timestamp_string = chrono::Local::now()
@@ -234,8 +237,8 @@ fn make_csv_writers() -> io::Result<(csv::Writer<File>, csv::Writer<File>)> {
         .to_string();
 
     // csv file paths
-    let button_csv_path = data_folder.join("buttons_".to_owned() + &timestamp_string);
-    let stick_csv_path = data_folder.join("sticks_".to_owned() + &timestamp_string);
+    let button_csv_path = data_folder.join(format!("{}buttons_{}.csv", prefix, timestamp_string));
+    let stick_csv_path = data_folder.join(format!("{}sticks_{}.csv", prefix, timestamp_string));
 
     // csv writers
     let button_csv_writer = csv::Writer::from_path(button_csv_path)?;
@@ -251,7 +254,13 @@ fn inner_listen(
     // if this fails, the event loop can never run
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
 
-    let mut writer_thread = WriterThread::default();
+    let mut writer_thread_map: HashMap<gilrs::GamepadId, WriterThread> = HashMap::new();
+
+    gilrs.gamepads().for_each(|(gamepad_id, gamepad)| {
+        let mut writer_thread = WriterThread::default();
+        writer_thread.file_name_prefix = make_controller_name_prefix(gamepad);
+        writer_thread_map.insert(gamepad_id, writer_thread);
+    });
 
     while should_run.load(Ordering::Relaxed) {
         // get events
@@ -273,11 +282,23 @@ fn inner_listen(
                     });
                 }
                 GilrsEventLoopEvent::StartRecording => {
-                    if let Err(e) = writer_thread.start() {
-                        warn!("Error starting writer thread: {:?}", e);
-                    }
+                    writer_thread_map
+                        .iter_mut()
+                        .for_each(|(gamepad_id, writer_thread)| {
+                            info!("starting recording for gamepad {:?}", gamepad_id);
+                            if let Err(e) = writer_thread.start() {
+                                warn!("Error starting writer thread: {:?}", e);
+                            }
+                        });
                 }
-                GilrsEventLoopEvent::StopRecording => writer_thread.stop(),
+                GilrsEventLoopEvent::StopRecording => {
+                    writer_thread_map
+                        .iter_mut()
+                        .for_each(|(gamepad_id, writer_thread)| {
+                            info!("stopping recording for gamepad {:?}", gamepad_id);
+                            writer_thread.stop();
+                        });
+                }
             }
         }
         while let Some(event) = gilrs.next_event() {
@@ -287,16 +308,31 @@ fn inner_listen(
                 ..
             } = event;
             match event_type {
-                EventType::AxisChanged(..) | EventType::ButtonChanged(..)
-                    if writer_thread.thread_handle.is_some() =>
-                {
-                    if let Err(e) = writer_thread.channels.tx.send(event) {
-                        warn!("Error sending event to writer thread: {:?}", e);
+                EventType::AxisChanged(..) | EventType::ButtonChanged(..) => {
+                    if let Some(writer_thread) = writer_thread_map.get_mut(&gamepad_id) {
+                        if let Err(e) = writer_thread.channels.tx.send(event) {
+                            warn!("Error sending event to writer thread: {:?}", e);
+                        }
                     }
                 }
                 EventType::Connected | EventType::Disconnected => {
                     let connected = matches!(event_type, EventType::Connected);
-                    let gamepad_name = gilrs.gamepad(gamepad_id).name().to_string();
+                    let gamepad = gilrs.gamepad(gamepad_id);
+                    if connected {
+                        // this shouldn't happen, but just in case
+                        if let Some(existing_writer_thread) = writer_thread_map.get_mut(&gamepad_id)
+                        {
+                            existing_writer_thread.stop();
+                        }
+                        let mut writer_thread = WriterThread::default();
+                        writer_thread.file_name_prefix = make_controller_name_prefix(gamepad);
+                        writer_thread_map.insert(gamepad_id, writer_thread);
+                    } else {
+                        if let Some(mut writer_thread) = writer_thread_map.remove(&gamepad_id) {
+                            writer_thread.stop();
+                        }
+                    }
+                    let gamepad_name = gamepad.name().to_string();
                     let connection_event = ControllerConnectionEvent {
                         connected,
                         controller_id: gamepad_id,
@@ -314,5 +350,24 @@ fn inner_listen(
         }
     }
     // stop the writer thread
-    writer_thread.stop();
+    writer_thread_map
+        .iter_mut()
+        .for_each(|(gamepad_id, writer_thread)| {
+            info!("stopping recording for gamepad {:?}", gamepad_id);
+            writer_thread.stop();
+        });
+}
+
+/// Returns a file name prefix for the given gamepad.
+///
+/// Format: `<gamepad_name>_<gamepad_id>_`
+///
+/// # Arguments
+///
+/// * `gamepad` - The gamepad to get the file name prefix for.
+///
+/// returns: `String`
+fn make_controller_name_prefix(gamepad: gilrs::Gamepad) -> String {
+    let prefix = gamepad.name().replace(' ', "_");
+    format!("{}_{}_", prefix, gamepad.id().to_string())
 }
