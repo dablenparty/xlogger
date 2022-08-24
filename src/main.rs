@@ -227,17 +227,16 @@ fn main() {
     {
         error!("{:?}", e);
     }
-    let native_options = match get_icon_data() {
-        Ok(icon_data) => eframe::NativeOptions {
+    let native_options = get_icon_data().map_or_else(
+        |err| {
+            warn!("Failed to load icon with error: {}", err);
+            eframe::NativeOptions::default()
+        },
+        |icon_data| eframe::NativeOptions {
             icon_data: Some(icon_data),
             ..eframe::NativeOptions::default()
         },
-
-        Err(e) => {
-            warn!("Failed to load icon with error: {}", e);
-            eframe::NativeOptions::default()
-        }
-    };
+    );
     eframe::run_native(
         "xlogger",
         native_options,
