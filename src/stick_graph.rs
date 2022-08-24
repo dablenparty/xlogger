@@ -1,7 +1,7 @@
 use std::{ffi::OsStr, path::PathBuf};
 
 use eframe::egui::{
-    plot::{Legend, Line, Plot, Points, Value, Values},
+    plot::{Legend, Line, Plot, PlotPoints, Points},
     Context, Slider, Ui, Window,
 };
 use log::{info, warn};
@@ -10,8 +10,8 @@ use crate::{ControllerStickEvent, EguiView};
 
 #[derive(Clone)]
 struct ControllerStickData {
-    left_values: Vec<Value>,
-    right_values: Vec<Value>,
+    left_values: Vec<[f64; 2]>,
+    right_values: Vec<[f64; 2]>,
 }
 
 pub struct ControllerStickGraph {
@@ -51,11 +51,11 @@ impl ControllerStickGraph {
         let (ls_events, rs_events) = csv::Reader::from_path(&data_path)?
             .deserialize::<ControllerStickEvent>()
             .try_fold::<_, _, Result<_, csv::Error>>(
-                (Vec::<Value>::new(), Vec::<Value>::new()),
+                (Vec::<[f64; 2]>::new(), Vec::<[f64; 2]>::new()),
                 |mut acc, result| {
                     let event = result?;
-                    acc.0.push(Value::new(event.left_x, event.left_y));
-                    acc.1.push(Value::new(event.right_x, event.right_y));
+                    acc.0.push([event.left_x, event.left_y]);
+                    acc.1.push([event.right_x, event.right_y]);
                     Ok(acc)
                 },
             )?;
@@ -105,13 +105,9 @@ impl EguiView for ControllerStickGraph {
                 .slider_timestamp
                 .saturating_add(midpoint.into())
                 .min(data.right_values.len())];
-        let ls_values = Values::from_values(ls_sliced.to_vec());
-        let rs_values = Values::from_values(
-            rs_sliced
-                .iter()
-                .map(|element| Value::new(element.x + 2.5, element.y))
-                .collect::<Vec<Value>>(),
-        );
+        let ls_values = PlotPoints::new(ls_sliced.to_vec());
+        // shift the right stick values to the right so they don't overlap the left stick
+        let rs_values = PlotPoints::new(rs_sliced.iter().map(|v| [v[0] + 2.5, v[1]]).collect());
         ui.horizontal(|ui| {
             ui.label("Time");
             let left_len = data.left_values.len();

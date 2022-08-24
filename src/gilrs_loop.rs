@@ -20,8 +20,9 @@ use crate::{
     CrossbeamChannelPair,
 };
 
+/// Gilrs Event Loop Event
 #[derive(Debug)]
-pub enum GilrsEventLoopEvent {
+pub enum GELEvent {
     GetAllControllers,
     StartRecording,
     StopRecording,
@@ -30,7 +31,7 @@ pub enum GilrsEventLoopEvent {
 #[derive(Default)]
 pub struct GilrsEventLoop {
     pub channels: CrossbeamChannelPair<ControllerConnectionEvent>,
-    pub event_channels: CrossbeamChannelPair<GilrsEventLoopEvent>,
+    pub event_channels: CrossbeamChannelPair<GELEvent>,
     should_run: Arc<AtomicBool>,
     loop_handle: Option<JoinHandle<()>>,
 }
@@ -85,10 +86,10 @@ impl WriterThread {
                     match event {
                         EventType::AxisChanged(axis, value, ..) => {
                             match axis {
-                                Axis::LeftStickX => left_stick_state.x = value,
-                                Axis::LeftStickY => left_stick_state.y = value,
-                                Axis::RightStickX => right_stick_state.x = value,
-                                Axis::RightStickY => right_stick_state.y = value,
+                                Axis::LeftStickX => left_stick_state.x = value as f64,
+                                Axis::LeftStickY => left_stick_state.y = value as f64,
+                                Axis::RightStickX => right_stick_state.x = value as f64,
+                                Axis::RightStickY => right_stick_state.y = value as f64,
                                 _ => {
                                     warn!("unhandled axis event: {:?}", event);
                                     continue;
@@ -248,7 +249,7 @@ fn make_csv_writers(prefix: &str) -> io::Result<(csv::Writer<File>, csv::Writer<
 fn inner_listen(
     should_run: &Arc<AtomicBool>,
     channels: &CrossbeamChannelPair<ControllerConnectionEvent>,
-    event_channels: &CrossbeamChannelPair<GilrsEventLoopEvent>,
+    event_channels: &CrossbeamChannelPair<GELEvent>,
 ) {
     // if this fails, the event loop can never run
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
@@ -268,7 +269,7 @@ fn inner_listen(
         for next_event in event_channels.rx.try_iter() {
             debug!("got event: {:?}", next_event);
             match next_event {
-                GilrsEventLoopEvent::GetAllControllers => {
+                GELEvent::GetAllControllers => {
                     gilrs.gamepads().for_each(|(id, gamepad)| {
                         if let Err(e) = channels.tx.send(ControllerConnectionEvent {
                             connected: true,
@@ -282,7 +283,7 @@ fn inner_listen(
                         }
                     });
                 }
-                GilrsEventLoopEvent::StartRecording => {
+                GELEvent::StartRecording => {
                     for (gamepad_id, writer_thread) in &mut writer_thread_map {
                         if let Err(e) = writer_thread.start() {
                             warn!("Error starting writer thread: {:?}", e);
@@ -290,7 +291,7 @@ fn inner_listen(
                         info!("started recording gamepad {}", gamepad_id);
                     }
                 }
-                GilrsEventLoopEvent::StopRecording => {
+                GELEvent::StopRecording => {
                     for (gamepad_id, writer_thread) in &mut writer_thread_map {
                         writer_thread.stop();
                         info!("stopped recording gamepad {}", gamepad_id);

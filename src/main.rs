@@ -10,8 +10,8 @@ use image::ImageResult;
 use log::{error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::button_graph::ControllerButtonGraph;
+use xlogger::gilrs_loop::GELEvent;
 use xlogger::gilrs_loop::GilrsEventLoop;
-use xlogger::gilrs_loop::GilrsEventLoopEvent;
 use xlogger::stick_graph::ControllerStickGraph;
 use xlogger::util::{create_dir_if_not_exists, get_exe_parent_dir};
 use xlogger::ControllerConnectionEvent;
@@ -28,7 +28,7 @@ struct XloggerApp {
 }
 
 impl eframe::App for XloggerApp {
-    fn on_exit(&mut self, _gl: &eframe::glow::Context) {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         // TODO: confirm exit if event loop is recording
         info!("Closing GILRS event loop");
         self.event_loop.stop_listening();
@@ -46,13 +46,13 @@ impl eframe::App for XloggerApp {
                 if ui.button(text).clicked() {
                     let (log_message, saved_text) = if self.event_loop_is_recording {
                         self.event_loop_is_recording = false;
-                        if let Err(e) = self.event_loop.event_channels.tx.send(GilrsEventLoopEvent::StopRecording) {
+                        if let Err(e) = self.event_loop.event_channels.tx.send(GELEvent::StopRecording) {
                             error!("Failed to send stop recording event: {:?}", e);
                         }
                         ("stopped listening to controllers", "Saved!".to_owned())
                     } else {
                         self.event_loop_is_recording = true;
-                        if let Err(e) = self.event_loop.event_channels.tx.send(GilrsEventLoopEvent::StartRecording) {
+                        if let Err(e) = self.event_loop.event_channels.tx.send(GELEvent::StartRecording) {
                             error!("Failed to send start recording event: {:?}", e);
                         }
                         ("started listening to controllers", "".to_owned())
@@ -223,7 +223,7 @@ fn main() {
         .event_loop
         .event_channels
         .tx
-        .send(GilrsEventLoopEvent::GetAllControllers)
+        .send(GELEvent::GetAllControllers)
     {
         error!("{:?}", e);
     }
