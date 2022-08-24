@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ffi::OsStr, ops::RangeInclusive, path::PathBuf};
 
 use eframe::egui::{
-    plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot, Value},
+    plot::{BoxElem, BoxPlot, BoxSpread, Legend, Plot, PlotPoint},
     ComboBox, Context, Ui, Window,
 };
 use log::info;
@@ -88,7 +88,7 @@ impl EguiView for ControllerButtonGraph {
         let x_fmt = |x: f64, _range: &RangeInclusive<f64>| f64_to_formatted_time(x);
 
         // formatter for the info displayed next to the cursor
-        let coord_fmt = |_string: &str, value: &Value| f64_to_formatted_time(value.x);
+        let coord_fmt = |_string: &str, value: &PlotPoint| f64_to_formatted_time(value.x);
 
         let box_plots: Vec<BoxPlot> = data
             .iter()
