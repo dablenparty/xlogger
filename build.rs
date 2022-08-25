@@ -1,9 +1,11 @@
-#[cfg(windows)]
-use image::{ImageOutputFormat, ImageResult};
+#[cfg(windows)] use {
+    image::{ImageOutputFormat, ImageResult},
+    std::{env, fs::File, io::BufWriter, path::PathBuf}
+};
+
 
 #[cfg(windows)]
 fn main() -> ImageResult<()> {
-    use std::{env, fs::File, io::BufWriter, path::PathBuf};
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     // write icon to output directory
