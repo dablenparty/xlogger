@@ -126,7 +126,6 @@ impl eframe::App for XloggerApp {
 ///
 /// In debug mode, the log level is set to debug for the terminal and info for the file.
 ///  In release mode, there is no terminal logger and the log level is set to info for the file.
-#[cfg(not(debug_assertions))]
 fn init_logger() -> BoxedResult<()> {
     // release mode
     let mut file_path = get_exe_parent_dir();
@@ -137,44 +136,32 @@ fn init_logger() -> BoxedResult<()> {
     file_path.push("logs");
     create_dir_if_not_exists(&file_path)?;
     file_path.push(filename);
-    WriteLogger::init(
-        LevelFilter::Info,
-        Config::default(),
-        File::create(&file_path)?,
-    )?;
-    Ok(())
-}
-
-/// Initializes the logging library
-///
-/// In debug mode, the log level is set to debug for the terminal and info for the file.
-///  In release mode, there is no terminal logger and the log level is set to info for the file.
-#[cfg(debug_assertions)]
-fn init_logger() -> BoxedResult<()> {
-    use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode};
-    // debug mode
-
-    let mut file_path = get_exe_parent_dir();
-    let filename = chrono::Local::now()
-        .naive_local()
-        .format("%Y-%m-%d %H-%M-%S.log")
-        .to_string();
-    file_path.push("logs");
-    create_dir_if_not_exists(&file_path)?;
-    file_path.push(filename);
-    CombinedLogger::init(vec![
-        WriteLogger::new(
+    #[cfg(not(debug_assertions))]
+    {
+        WriteLogger::init(
             LevelFilter::Info,
             Config::default(),
             File::create(&file_path)?,
-        ),
-        TermLogger::new(
-            LevelFilter::Debug,
-            Config::default(),
-            TerminalMode::Mixed,
-            ColorChoice::Always,
-        ),
-    ])?;
+        )?;
+    }
+    #[cfg(debug_assertions)]
+    {
+        use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode};
+
+        CombinedLogger::init(vec![
+            WriteLogger::new(
+                LevelFilter::Info,
+                Config::default(),
+                File::create(&file_path)?,
+            ),
+            TermLogger::new(
+                LevelFilter::Debug,
+                Config::default(),
+                TerminalMode::Mixed,
+                ColorChoice::Always,
+            ),
+        ])?;
+    }
     Ok(())
 }
 
