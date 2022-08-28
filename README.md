@@ -9,16 +9,16 @@ Below are the platforms I have tested xlogger on:
 - Windows
   - Developed on Windows 10/11, for Windows 10/11.
 - MacOS?
-  - This should work out-of-the-box.
+  - Manually tested on MacOS Monterey, installed via dmg.
 - Linux\*
   - I have managed to get this working on Ubuntu 22.04. If you are building yourself, see [Build instructions](#build-instructions).
 
 ## Installation
 
-- Download the latest release zip file
-- Extract it wherever you want (I highly recommend extracting to its own folder)
-- Create a shortcut for `xlogger.exe` and put it wherever (optional)
-- Run it
+- Windows/MacOS:
+  - Download the installer for your system and run it.
+- Linux
+  - For now, you need to build xlogger yourself from source. See [Build instructions](#build-instructions).
 
 ## Usage
 
