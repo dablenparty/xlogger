@@ -1,10 +1,8 @@
 #[cfg(target_os = "macos")]
-use std::{fs, io, process::Command};
+use std::{fs, io, path::PathBuf, process::Command};
 
 #[cfg(target_os = "macos")]
-fn main() -> Result<(), io::Error> {
-    use std::path::PathBuf;
-
+fn main() -> io::Result<()> {
     const XLOGGER_TARGET: &str = "target/release/macos/xlogger/xlogger.app";
     const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
     if PathBuf::from(XLOGGER_TARGET).exists() {
