@@ -6,6 +6,7 @@ use std::process;
 use eframe::egui;
 use eframe::IconData;
 use human_panic::setup_panic;
+#[cfg(windows)]
 use image::ImageResult;
 use log::{error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
@@ -172,6 +173,7 @@ fn init_logger() -> BoxedResult<()> {
 /// This function errors if there is an issue reading the icon data from the file.
 ///
 /// returns: `ImageResult<IconData>`
+#[cfg(windows)]
 fn get_icon_data() -> ImageResult<IconData> {
     let path = concat!(env!("OUT_DIR"), "/icon.ico");
     let icon = image::open(path)?.to_rgba8();
@@ -182,6 +184,14 @@ fn get_icon_data() -> ImageResult<IconData> {
         height,
         rgba: icon.into_raw(),
     })
+}
+
+/// Icon data being loaded by the application is not currently supported
+/// on non-windows platforms. This function is a no-op and just returns an
+/// `io::ErrorKind::Unsupported` wrapped in an `io::Result`.
+#[cfg(not(windows))]
+fn get_icon_data() -> std::io::Result<IconData> {
+    Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
 }
 
 fn main() {

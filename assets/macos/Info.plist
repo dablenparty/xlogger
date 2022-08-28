@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.dablenparty.xlogger</string>
+	<key>CFBundleName</key>
+	<string>xlogger</string>
+	<key>CFBundleVersion</key>
+	<string>{XLOGGER_BUNDLE_VERSION}</string>
+	<key>CFBundleShortVersionString</key>
+	<string>{XLOGGER_BUNDLE_VERSION_SHORT}</string>
+	<key>CFBundleExecutable</key>
+	<string>xlogger</string>
+	<key>CFBundleIconName</key>
+	<string>icon</string>
+	<key>CFBundleIconFile</key>
+	<string>icon.icns</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSMainNibFile</key>
+	<string></string>
+</dict>
+</plist>
