@@ -1,5 +1,8 @@
 #[cfg(target_os = "macos")]
-use std::{fs, io, path::PathBuf, process::Command};
+use std::path::PathBuf;
+use std::{fs, io, process::Command};
+
+const CARGO_BUILD_ARGS: &[&str] = &["build", "--release", "--bin", "xlogger"];
 
 #[cfg(target_os = "macos")]
 fn main() -> io::Result<()> {
@@ -10,9 +13,7 @@ fn main() -> io::Result<()> {
         fs::remove_dir_all(XLOGGER_TARGET)?;
     }
     // compile in release
-    Command::new("cargo")
-        .args(["build", "--release", "--bin", "xlogger"])
-        .status()?;
+    Command::new("cargo").args(CARGO_BUILD_ARGS).status()?;
     println!("building xlogger.app");
     // copy binary
     let contents_folder = format!("{}/Contents", XLOGGER_TARGET);
@@ -49,7 +50,24 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn main() -> io::Result<()> {
+    const XLOGGER_TARGET: &str = "target\\release\\windows\\xlogger";
+    println!("building xlogger.exe");
+    // compile in release
+    Command::new("cargo").args(CARGO_BUILD_ARGS).status()?;
+    println!("packaging xlogger.exe");
+    // for now, just copy the binary to the output directory
+    //? maybe later, pack into an msi using something like wix
+    fs::create_dir_all(XLOGGER_TARGET)?;
+    fs::copy(
+        "target\\release\\xlogger.exe",
+        format!("{}\\xlogger.exe", XLOGGER_TARGET),
+    )?;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
 fn main() {
-    // TODO: implement packaging for Windows and Linux
+    // TODO: implement packaging for Linux
 }
