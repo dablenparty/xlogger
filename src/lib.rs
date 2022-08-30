@@ -127,6 +127,12 @@ pub enum TextState {
     Default,
 }
 
+impl Default for TextState {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
 /// Text that has a state associated with it.
 ///
 /// By default, the colors are as follows:
@@ -134,29 +140,12 @@ pub enum TextState {
 /// * Success: green
 /// * Error: red
 /// * Warning: yellow
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct StatefulText {
     /// The text to display.
     pub text: String,
     /// The state of the text.
     pub state: TextState,
-    success_color: Color32,
-    error_color: Color32,
-    warning_color: Color32,
-    default_color: Color32,
-}
-
-impl Default for StatefulText {
-    fn default() -> Self {
-        Self {
-            text: String::default(),
-            state: TextState::Default,
-            success_color: Color32::GREEN,
-            error_color: Color32::RED,
-            warning_color: Color32::YELLOW,
-            default_color: Color32::WHITE,
-        }
-    }
 }
 
 impl StatefulText {
@@ -169,14 +158,7 @@ impl StatefulText {
     ///
     /// returns: `StatefulText`
     pub fn new(text: String, state: TextState) -> Self {
-        Self {
-            text,
-            state,
-            success_color: Color32::GREEN,
-            error_color: Color32::RED,
-            warning_color: Color32::YELLOW,
-            default_color: Color32::GRAY,
-        }
+        Self { text, state }
     }
 
     /// Adds the text to the UI.
@@ -184,14 +166,14 @@ impl StatefulText {
     /// # Arguments
     ///
     /// * `ui`: The UI to add the text to.
-    pub fn show(&self, ui: &mut Ui) {
+    pub fn show(&self, ui: &mut Ui) -> eframe::egui::Response {
         let color = match self.state {
-            TextState::Success => self.success_color,
-            TextState::Error => self.error_color,
-            TextState::Warning => self.warning_color,
-            TextState::Default => self.default_color,
+            TextState::Success => Color32::GREEN,
+            TextState::Error => Color32::RED,
+            TextState::Warning => Color32::YELLOW,
+            TextState::Default => Color32::GRAY,
         };
-        ui.colored_label(color, &self.text);
+        ui.colored_label(color, &self.text)
     }
 }
 
@@ -243,7 +225,7 @@ fn get_xbox_button(button: gilrs::Button) -> String {
 }
 
 fn get_playstation_button(button: gilrs::Button) -> String {
-    // TODO: use symbols
+    // for now, unicode symbols just show up as a box in egui
     match button {
         gilrs::Button::South => "X".to_string(),
         gilrs::Button::East => "O".to_string(),
