@@ -42,9 +42,15 @@ impl eframe::App for XloggerApp {
                     StatefulText::new("The GILRS event loop is not running. Please restart the application.\n\nIf the issue persists, check the logs for more information.".to_string(), xlogger::TextState::Error).show(ui);
                 });
             }
-            let text = if self.event_loop_is_recording { "Stop" } else { "Start" };
+            let start_button_text = if self.event_loop_is_recording { "Stop" } else { "Start" };
             ui.horizontal(|ui| {
-                if ui.button(text).clicked() {
+                if ui.button(start_button_text).clicked() {
+                    // don't allow starting if there are no controllers (until hotplugging is implemented)
+                    if self.connected_controllers.len() == 0 {
+                        self.saved_text.text = "No controllers connected!".to_string();
+                        self.saved_text.state = xlogger::TextState::Warning;
+                        return ();
+                    }
                     let (log_message, saved_text) = if self.event_loop_is_recording {
                         self.event_loop_is_recording = false;
                         if let Err(e) = self.event_loop.event_channels.tx.send(GELEvent::StopRecording) {
