@@ -11,6 +11,7 @@ use image::ImageResult;
 use log::{error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
 use xlogger::button_graph::ControllerButtonGraph;
+use xlogger::error_window::ErrorWindow;
 use xlogger::gilrs_loop::GELEvent;
 use xlogger::gilrs_loop::GilrsEventLoop;
 use xlogger::stick_graph::ControllerStickGraph;
@@ -54,12 +55,14 @@ impl eframe::App for XloggerApp {
                         self.event_loop_is_recording = false;
                         if let Err(e) = self.event_loop.event_channels.tx.send(GELEvent::StopRecording) {
                             error!("Failed to send stop recording event: {:?}", e);
+                            self.open_views.push((true, Box::new(ErrorWindow::new(e))));
                         }
                         ("stopped listening to controllers", "Saved!".to_owned())
                     } else {
                         self.event_loop_is_recording = true;
                         if let Err(e) = self.event_loop.event_channels.tx.send(GELEvent::StartRecording) {
                             error!("Failed to send start recording event: {:?}", e);
+                            self.open_views.push((true, Box::new(ErrorWindow::new(e))));
                         }
                         ("started listening to controllers", "".to_owned())
                     };
@@ -69,7 +72,6 @@ impl eframe::App for XloggerApp {
                 self.saved_text.show(ui);
             });
             ui.horizontal(|ui| {
-                // TODO: find a way to display errors back to the user
                 if ui.button("Visualize Sticks").clicked() {
                     // opens to the data folder
                     // if it doesn't exist, RFD defaults to the Documents folder
@@ -77,6 +79,7 @@ impl eframe::App for XloggerApp {
                         let mut graph = ControllerStickGraph::default();
                         if let Err(e) = graph.load(path) {
                             error!("{:?}", e);
+                            self.open_views.push((true, Box::new(ErrorWindow::new(e))));
                         } else {
                             self.open_views.push((true, Box::new(graph)));
                         }
@@ -87,6 +90,7 @@ impl eframe::App for XloggerApp {
                         let mut graph = ControllerButtonGraph::default();
                         if let Err(e) = graph.load(path) {
                             error!("{:?}", e);
+                            self.open_views.push((true, Box::new(ErrorWindow::new(e))));
                         } else {
                             self.open_views.push((true, Box::new(graph)));
                         }
