@@ -18,7 +18,7 @@ pub struct ControllerStickGraph {
     csv_data: Option<ControllerStickData>,
     data_offset: u8,
     data_path: Option<PathBuf>,
-    plot_id: String,
+    plot_id: uuid::Uuid,
     show_lines: bool,
     slider_timestamp: usize,
 }
@@ -29,7 +29,7 @@ impl Default for ControllerStickGraph {
             csv_data: None,
             data_offset: 50,
             data_path: None,
-            plot_id: uuid::Uuid::new_v4().to_string(),
+            plot_id: uuid::Uuid::new_v4(),
             show_lines: true,
             slider_timestamp: 0,
         }
@@ -46,7 +46,7 @@ impl ControllerStickGraph {
     /// # Errors
     ///
     /// This function will return an error if the CSV data is invalid or not found.
-    pub fn load(&mut self, data_path: PathBuf) -> Result<(), csv::Error> {
+    pub fn load(&mut self, data_path: PathBuf) -> csv::Result<()> {
         info!("Loading stick data from {}", data_path.display());
         let (ls_events, rs_events) = csv::Reader::from_path(&data_path)?
             .deserialize::<ControllerStickEvent>()
@@ -124,7 +124,7 @@ impl EguiView for ControllerStickGraph {
             ui.add(Slider::new(&mut self.data_offset, u8::MIN..=u8::MAX))
                 .on_hover_text("Higher values may affect performance");
         });
-        Plot::new(&self.plot_id)
+        Plot::new(self.plot_id)
             .data_aspect(1.0)
             .legend(Legend::default())
             .show(ui, |plot_ui| {

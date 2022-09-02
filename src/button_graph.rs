@@ -12,7 +12,7 @@ use crate::{util::f64_to_formatted_time, ControllerButtonEvent, ControllerType, 
 pub struct ControllerButtonGraph {
     csv_data: Option<HashMap<gilrs::Button, Vec<ControllerButtonEvent>>>,
     data_path: Option<PathBuf>,
-    plot_id: String,
+    plot_id: uuid::Uuid,
     controller_type: ControllerType,
 }
 
@@ -22,7 +22,7 @@ impl Default for ControllerButtonGraph {
             csv_data: None,
             data_path: None,
             controller_type: ControllerType::default(),
-            plot_id: uuid::Uuid::new_v4().to_string(),
+            plot_id: uuid::Uuid::new_v4(),
         }
     }
 }
@@ -37,7 +37,7 @@ impl ControllerButtonGraph {
     /// # Errors
     ///
     /// This function will return an error if the CSV data is invalid or not found.
-    pub fn load(&mut self, data_path: PathBuf) -> Result<(), csv::Error> {
+    pub fn load(&mut self, data_path: PathBuf) -> csv::Result<()> {
         info!("loading button data from {}", data_path.display());
         let data = csv::Reader::from_path(&data_path)?
             .deserialize::<ControllerButtonEvent>()
@@ -137,7 +137,7 @@ impl EguiView for ControllerButtonGraph {
                 }
             });
 
-        Plot::new(&self.plot_id)
+        Plot::new(self.plot_id)
             .legend(Legend::default())
             .label_formatter(coord_fmt)
             .x_axis_formatter(x_fmt)
