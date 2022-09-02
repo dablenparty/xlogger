@@ -21,8 +21,7 @@ use xlogger::{open_dialog_in_data_folder, BoxedResult, EguiView, StatefulText};
 #[derive(Default)]
 struct XloggerApp {
     saved_text: StatefulText,
-    stick_graphs: Vec<(bool, ControllerStickGraph)>,
-    button_graphs: Vec<(bool, ControllerButtonGraph)>,
+    open_views: Vec<(bool, Box<dyn EguiView>)>,
     event_loop: GilrsEventLoop,
     connected_controllers: Vec<ControllerConnectionEvent>,
     event_loop_is_recording: bool,
@@ -79,7 +78,7 @@ impl eframe::App for XloggerApp {
                         if let Err(e) = graph.load(path) {
                             error!("{:?}", e);
                         } else {
-                            self.stick_graphs.push((true, graph));
+                            self.open_views.push((true, Box::new(graph)));
                         }
                     }
                 };
@@ -89,7 +88,7 @@ impl eframe::App for XloggerApp {
                         if let Err(e) = graph.load(path) {
                             error!("{:?}", e);
                         } else {
-                            self.button_graphs.push((true, graph));
+                            self.open_views.push((true, Box::new(graph)));
                         }
                     }
                 }
@@ -112,19 +111,10 @@ impl eframe::App for XloggerApp {
                     ui.label(format!("[{}] {}", e.controller_id, e.gamepad_name));
                 }
             });
-            self.stick_graphs
-                .iter_mut()
-                .for_each(|(show_graph, graph)| {
-                    graph.show(ctx, show_graph);
-                });
-            // remove the stick graphs that are closed (they're set to show when they're created)
-            self.stick_graphs.retain(|(show_graph, _)| *show_graph);
-            self.button_graphs
-                .iter_mut()
-                .for_each(|(show_graph, graph)| {
-                    graph.show(ctx, show_graph);
-                });
-            self.button_graphs.retain(|(show_graph, _)| *show_graph);
+            self.open_views.retain(|(show_view, _)| *show_view);
+            self.open_views.iter_mut().for_each(|(show_view, view)| {
+                view.show(ctx, show_view);
+            });
         });
     }
 }
