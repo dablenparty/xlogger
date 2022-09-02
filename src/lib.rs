@@ -8,6 +8,7 @@ use strum::EnumIter;
 use crate::util::get_exe_parent_dir;
 
 pub mod button_graph;
+pub mod error_window;
 pub mod gilrs_loop;
 pub mod stick_graph;
 pub mod util;
