@@ -1,6 +1,8 @@
-use std::fs::create_dir_all;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::{
+    fs::create_dir_all,
+    io,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use log::warn;

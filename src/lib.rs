@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
-use eframe::egui::{Context, Ui};
-use eframe::epaint::Color32;
+use eframe::{
+    egui::{Context, Ui},
+    epaint::Color32,
+};
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 use util::get_exe_parent_dir;

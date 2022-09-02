@@ -1,23 +1,22 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::fs::File;
-use std::process;
+use std::{fs::File, process};
 
-use eframe::egui;
-use eframe::IconData;
+use eframe::{egui, IconData};
 use human_panic::setup_panic;
 #[cfg(windows)]
 use image::ImageResult;
 use log::{error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
-use xlogger::button_graph::ControllerButtonGraph;
-use xlogger::error_window::ErrorWindow;
-use xlogger::gilrs_loop::GELEvent;
-use xlogger::gilrs_loop::GilrsEventLoop;
-use xlogger::stick_graph::ControllerStickGraph;
-use xlogger::util::{create_dir_if_not_exists, get_exe_parent_dir};
-use xlogger::{open_dialog_in_data_folder, BoxedResult, EguiView, StatefulText};
-use xlogger::{ControllerConnectionEvent, CsvLoad};
+use xlogger::{
+    button_graph::ControllerButtonGraph,
+    error_window::ErrorWindow,
+    gilrs_loop::{GELEvent, GilrsEventLoop},
+    open_dialog_in_data_folder,
+    stick_graph::ControllerStickGraph,
+    util::{create_dir_if_not_exists, get_exe_parent_dir},
+    BoxedResult, ControllerConnectionEvent, CsvLoad, EguiView, StatefulText,
+};
 
 #[derive(Default)]
 struct XloggerApp {
