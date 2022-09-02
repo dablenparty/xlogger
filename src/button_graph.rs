@@ -7,7 +7,9 @@ use eframe::egui::{
 use log::info;
 use strum::IntoEnumIterator;
 
-use crate::{util::f64_to_formatted_time, ControllerButtonEvent, ControllerType, EguiView};
+use crate::{
+    util::f64_to_formatted_time, ControllerButtonEvent, ControllerType, CsvLoad, EguiView,
+};
 
 pub struct ControllerButtonGraph {
     csv_data: Option<HashMap<gilrs::Button, Vec<ControllerButtonEvent>>>,
@@ -27,17 +29,8 @@ impl Default for ControllerButtonGraph {
     }
 }
 
-impl ControllerButtonGraph {
-    /// Load CSV data into this graph
-    ///
-    /// # Arguments
-    ///
-    /// * `data_path` - Path to the CSV file to load
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the CSV data is invalid or not found.
-    pub fn load(&mut self, data_path: PathBuf) -> csv::Result<()> {
+impl CsvLoad for ControllerButtonGraph {
+    fn load(&mut self, data_path: PathBuf) -> csv::Result<()> {
         info!("loading button data from {}", data_path.display());
         let data = csv::Reader::from_path(&data_path)?
             .deserialize::<ControllerButtonEvent>()

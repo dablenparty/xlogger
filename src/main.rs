@@ -16,8 +16,8 @@ use xlogger::gilrs_loop::GELEvent;
 use xlogger::gilrs_loop::GilrsEventLoop;
 use xlogger::stick_graph::ControllerStickGraph;
 use xlogger::util::{create_dir_if_not_exists, get_exe_parent_dir};
-use xlogger::ControllerConnectionEvent;
 use xlogger::{open_dialog_in_data_folder, BoxedResult, EguiView, StatefulText};
+use xlogger::{ControllerConnectionEvent, CsvLoad};
 
 #[derive(Default)]
 struct XloggerApp {
