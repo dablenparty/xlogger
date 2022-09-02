@@ -26,21 +26,54 @@ struct XloggerApp {
     event_loop: GilrsEventLoop,
     connected_controllers: Vec<ControllerConnectionEvent>,
     event_loop_is_recording: bool,
+    allow_close: bool,
+    show_close_confirmation: bool,
 }
 
 impl eframe::App for XloggerApp {
+    fn on_close_event(&mut self) -> bool {
+        if self.event_loop_is_recording {
+            self.show_close_confirmation = true;
+            self.allow_close
+        } else {
+            true
+        }
+    }
+
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        // TODO: confirm exit if event loop is recording
         info!("Closing GILRS event loop");
         self.event_loop.stop_listening();
     }
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             if !self.event_loop.is_running() {
                 egui::Window::new("Critical Error").title_bar(true).show(ctx, |ui| {
                     StatefulText::new("The GILRS event loop is not running. Please restart the application.\n\nIf the issue persists, check the logs for more information.".to_string(), xlogger::TextState::Error).show(ui);
                 });
+            }
+            if self.show_close_confirmation {
+                egui::Window::new("Close Confirmation")
+                    .title_bar(true)
+                    .collapsible(false)
+                    .resizable(false).show(ctx, |ui|{
+                        ui.heading("Currently recording");
+                        ui.label("Are you sure you want to close the application? This will stop recording.");
+                        ui.separator();
+                        ui.horizontal(|ui|{
+                            if ui.button("Cancel").clicked() {
+                                self.show_close_confirmation = false;
+                            }
+                            if ui.button("Ok").clicked() {
+                                self.allow_close = true;
+                                if let Err(e) = self.event_loop.event_channels.tx.send(GELEvent::StopRecording) {
+                                    error!("Failed to send stop recording event: {:?}", e);
+                                }
+                                self.event_loop_is_recording = false;
+                                frame.close();
+                            }
+                        });
+                    });
             }
             let start_button_text = if self.event_loop_is_recording { "Stop" } else { "Start" };
             ui.horizontal(|ui| {
