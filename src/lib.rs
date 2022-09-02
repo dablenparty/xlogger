@@ -4,8 +4,7 @@ use eframe::egui::{Context, Ui};
 use eframe::epaint::Color32;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
-
-use crate::util::get_exe_parent_dir;
+use util::get_exe_parent_dir;
 
 pub mod button_graph;
 pub mod error_window;
