@@ -32,6 +32,19 @@ pub trait EguiView {
     fn ui(&mut self, ui: &mut Ui);
 }
 
+pub trait CsvLoad {
+    /// Load CSV data into the struct this trait is implemented for.
+    ///
+    /// # Arguments
+    ///
+    /// * `data_path` - Path to the CSV file to load
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the CSV data is invalid or not found.
+    fn load(&mut self, data_path: PathBuf) -> csv::Result<()>;
+}
+
 /// A helper struct for working with a pair of crossbeam sender & receiver channels
 #[derive(Debug)]
 pub struct CrossbeamChannelPair<T> {
