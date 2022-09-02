@@ -337,10 +337,10 @@ fn inner_listen(
                         controller_id: gamepad_id,
                         gamepad_name,
                     };
-                    if let Err(e) = channels.tx.send(connection_event.clone()) {
+                    if let Err(e) = channels.tx.send(connection_event) {
                         error!(
-                            "failed to send connection event <{:?}> to channel with following error: {:?}",
-                            connection_event, e
+                            "failed to send connection event for gamepad <{:?}> to channel with following error: {:?}",
+                            gamepad_id, e
                         );
                     }
                 }

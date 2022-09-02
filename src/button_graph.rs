@@ -137,7 +137,7 @@ impl EguiView for ControllerButtonGraph {
                 }
             });
 
-        Plot::new(self.plot_id.clone())
+        Plot::new(&self.plot_id)
             .legend(Legend::default())
             .label_formatter(coord_fmt)
             .x_axis_formatter(x_fmt)

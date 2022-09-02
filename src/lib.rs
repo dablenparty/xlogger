@@ -32,7 +32,7 @@ pub trait EguiView {
     fn ui(&mut self, ui: &mut Ui);
 }
 
-/// A helper struct for working with a pair of MPSC sender & receiver channels
+/// A helper struct for working with a pair of crossbeam sender & receiver channels
 #[derive(Debug)]
 pub struct CrossbeamChannelPair<T> {
     /// The sender channel
@@ -58,7 +58,7 @@ impl<T> Default for CrossbeamChannelPair<T> {
 }
 
 /// Represents data for a controller connection event
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ControllerConnectionEvent {
     /// `true` if the controller is connected, `false` otherwise
     pub connected: bool,

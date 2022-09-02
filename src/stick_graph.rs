@@ -124,7 +124,7 @@ impl EguiView for ControllerStickGraph {
             ui.add(Slider::new(&mut self.data_offset, u8::MIN..=u8::MAX))
                 .on_hover_text("Higher values may affect performance");
         });
-        Plot::new(self.plot_id.clone())
+        Plot::new(&self.plot_id)
             .data_aspect(1.0)
             .legend(Legend::default())
             .show(ui, |plot_ui| {
