@@ -102,11 +102,17 @@ impl WriterThread {
                                     continue;
                                 }
                             }
+                            let time = if let Ok(d) = event_time.duration_since(start_time) {
+                                d.as_secs_f64()
+                            } else {
+                                debug!(
+                                    "ignoring old event from {} at {:?}",
+                                    gamepad_id, event_time
+                                );
+                                continue;
+                            };
                             let stick_event = ControllerStickEvent {
-                                time: event_time
-                                    .duration_since(start_time)
-                                    .expect("time went backwards!")
-                                    .as_secs_f64(),
+                                time,
                                 left_x: left_stick_state.x,
                                 left_y: left_stick_state.y,
                                 right_x: right_stick_state.x,
@@ -129,14 +135,22 @@ impl WriterThread {
                             if value == 0.0 {
                                 let down_time =
                                     time_map.remove(&gamepad_id).unwrap_or_else(SystemTime::now);
+                                if down_time < start_time || event_time < start_time {
+                                    debug!(
+                                        "ignoring old event from {} at {:?}",
+                                        gamepad_id, event_time
+                                    );
+                                    continue;
+                                }
+                                // unwrap is safe since time validation is done above
                                 let button_event = ControllerButtonEvent {
                                     press_time: down_time
                                         .duration_since(start_time)
-                                        .expect("time went backwards!")
+                                        .unwrap()
                                         .as_secs_f64(),
                                     release_time: event_time
                                         .duration_since(start_time)
-                                        .expect("time went backwards!")
+                                        .unwrap()
                                         .as_secs_f64(),
                                     button,
                                 };
@@ -182,6 +196,10 @@ impl WriterThread {
         if let Err(e) = self.thread_handle.take().unwrap().join() {
             error!("failed to join writer thread with following error: {:?}", e);
         }
+    }
+
+    fn is_running(&self) -> bool {
+        self.thread_handle.is_some()
     }
 }
 
@@ -305,9 +323,15 @@ fn handle_gilrs_event(
     } = event;
     match event_type {
         EventType::AxisChanged(_, value, _) | EventType::ButtonChanged(_, value, _) => {
+            // this wonderfully nested mess is to avoid clogging the channels with events
+            // that are not being recorded
             if let Some(writer_thread) = writer_thread_map.get_mut(&gamepad_id) {
-                if let Err(e) = writer_thread.channels.tx.send(event) {
-                    warn!("Error sending event to writer thread: {:?}", e);
+                if writer_thread.is_running() {
+                    writer_thread
+                        .channels
+                        .tx
+                        .send(event)
+                        .unwrap_or_else(|e| warn!("Error sending event to writer thread: {:?}", e));
                 }
             }
             let highlight_event = if value == 0.0 {
