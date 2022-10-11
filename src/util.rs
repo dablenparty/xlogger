@@ -84,7 +84,6 @@ pub fn get_exe_parent_dir() -> PathBuf {
             );
             resolved_path
         })
-        .to_path_buf()
 }
 
 /// Formats an f64 to a string with the format "%H:%M:%S.%2f"
