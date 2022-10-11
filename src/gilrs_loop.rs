@@ -28,6 +28,7 @@ pub enum GELEvent {
     StopRecording,
 }
 
+#[derive(Debug)]
 pub enum ControllerHighlightEvent {
     Highlight(gilrs::GamepadId),
     Unhighlight(gilrs::GamepadId),
@@ -203,7 +204,10 @@ impl GilrsEventLoop {
     /// Starts an event loop that listens for controller events and writes them to a file.
     ///
     /// This function is run on a separate thread.
-    pub fn listen_for_events(&mut self) -> Result<(), GilrsEventLoopError> {
+    pub fn listen_for_events(
+        &mut self,
+        egui_ctx: eframe::egui::Context,
+    ) -> Result<(), GilrsEventLoopError> {
         if self.loop_handle.is_some() {
             return Err(GilrsEventLoopError::NoLoopHandle);
         }
@@ -212,7 +216,7 @@ impl GilrsEventLoop {
         let channels = self.channels.clone();
         let event_channels = self.event_channels.clone();
         self.loop_handle = Some(thread::spawn(move || {
-            inner_listen(&should_run, &channels, &event_channels);
+            inner_listen(&should_run, &channels, &event_channels, egui_ctx);
         }));
         Ok(())
     }
@@ -256,6 +260,7 @@ fn inner_listen(
     should_run: &Arc<AtomicBool>,
     channels: &CrossbeamChannelPair<ControllerHighlightEvent>,
     event_channels: &CrossbeamChannelPair<GELEvent>,
+    egui_ctx: eframe::egui::Context,
 ) {
     // if this fails, the event loop can never run
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
@@ -316,12 +321,23 @@ fn inner_listen(
                 ..
             } = event;
             match event_type {
-                EventType::AxisChanged(..) | EventType::ButtonChanged(..) => {
+                EventType::AxisChanged(_, value, _) | EventType::ButtonChanged(_, value, _) => {
                     if let Some(writer_thread) = writer_thread_map.get_mut(&gamepad_id) {
                         if let Err(e) = writer_thread.channels.tx.send(event) {
                             warn!("Error sending event to writer thread: {:?}", e);
                         }
                     }
+                    let highlight_event = if value == 0.0 {
+                        ControllerHighlightEvent::Unhighlight(gamepad_id)
+                    } else {
+                        ControllerHighlightEvent::Highlight(gamepad_id)
+                    };
+                    if let Err(e) = channels.tx.send(highlight_event) {
+                        error!("Error sending controller highlight to main thread: {:?}", e);
+                    }
+                    // without this, the GUI doesn't update and the controller highlight doesn't
+                    // change properly (egui is pretty smart about repaints)
+                    eframe::egui::Context::request_repaint(&egui_ctx);
                 }
                 EventType::Connected | EventType::Disconnected => {
                     let connected = matches!(event_type, EventType::Connected);
@@ -347,7 +363,10 @@ fn inner_listen(
                         controller_id: gamepad_id,
                         gamepad_name,
                     };
-                    if let Err(e) = channels.tx.send(ControllerHighlightEvent::ConnectionEvent(connection_event)) {
+                    if let Err(e) = channels
+                        .tx
+                        .send(ControllerHighlightEvent::ConnectionEvent(connection_event))
+                    {
                         error!(
                             "failed to send connection event for gamepad <{:?}> to channel with following error: {:?}",
                             gamepad_id, e

@@ -1,8 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::{fs::File, process};
+use std::{collections::HashMap, fs::File, process};
 
-use eframe::{egui, IconData};
+use eframe::{egui, epaint::Color32, IconData};
 use human_panic::setup_panic;
 #[cfg(windows)]
 use image::ImageResult;
@@ -15,7 +15,7 @@ use xlogger::{
     open_dialog_in_data_folder,
     stick_graph::ControllerStickGraph,
     util::{create_dir_if_not_exists, get_exe_parent_dir},
-    BoxedResult, ControllerConnectionEvent, CsvLoad, EguiView, StatefulText,
+    BoxedResult, CsvLoad, EguiView, StatefulText,
 };
 
 #[derive(Default)]
@@ -23,7 +23,7 @@ struct XloggerApp {
     saved_text: StatefulText,
     open_views: Vec<(bool, Box<dyn EguiView>)>,
     event_loop: GilrsEventLoop,
-    connected_controllers: Vec<ControllerConnectionEvent>,
+    connected_controllers: HashMap<gilrs::GamepadId, (String, Color32)>,
     event_loop_is_recording: bool,
     allow_close: bool,
     show_close_confirmation: bool,
@@ -78,10 +78,10 @@ impl eframe::App for XloggerApp {
             ui.horizontal(|ui| {
                 if ui.button(start_button_text).clicked() {
                     // don't allow starting if there are no controllers (until hotplugging is implemented)
-                    if self.connected_controllers.len() == 0 {
+                    if self.connected_controllers.is_empty() {
                         self.saved_text.text = "No controllers connected!".to_string();
                         self.saved_text.state = xlogger::TextState::Warning;
-                        return ();
+                        return;
                     }
                     let (log_message, saved_text) = if self.event_loop_is_recording {
                         self.event_loop_is_recording = false;
@@ -132,14 +132,21 @@ impl eframe::App for XloggerApp {
             // TODO: make event type an enum, highlight controller in list on input
             for e in self.event_loop.channels.rx.try_iter() {
                 match e {
-                    xlogger::gilrs_loop::ControllerHighlightEvent::Highlight(_) => todo!(),
-                    xlogger::gilrs_loop::ControllerHighlightEvent::Unhighlight(_) => todo!(),
+                    xlogger::gilrs_loop::ControllerHighlightEvent::Highlight(id) => {
+                        if let Some((_, color)) = self.connected_controllers.get_mut(&id) {
+                            *color = Color32::WHITE;
+                        }
+                    },
+                    xlogger::gilrs_loop::ControllerHighlightEvent::Unhighlight(id) => {
+                        if let Some((_, color)) = self.connected_controllers.get_mut(&id) {
+                            *color = Color32::GRAY;
+                        }
+                    },
                     xlogger::gilrs_loop::ControllerHighlightEvent::ConnectionEvent(e) => {
                         if e.connected {
-                            self.connected_controllers.push(e);
+                            self.connected_controllers.insert(e.controller_id, (e.gamepad_name, Color32::GRAY));
                         } else {
-                            self.connected_controllers
-                            .retain(|c| c.controller_id != e.controller_id);
+                            self.connected_controllers.remove(&e.controller_id);
                         }
                     },
                 }
@@ -149,8 +156,8 @@ impl eframe::App for XloggerApp {
                     "Connected controllers: {}",
                     self.connected_controllers.len()
                 ));
-                for e in &self.connected_controllers {
-                    ui.label(format!("[{}] {}", e.controller_id, e.gamepad_name));
+                for (id, (name, color)) in &self.connected_controllers {
+                    ui.colored_label(color.to_owned(), format!("[{}] {}", id, name));
                 }
             });
             self.open_views.retain(|(show_view, _)| *show_view);
@@ -249,10 +256,6 @@ fn main() {
     };
 
     let mut app = XloggerApp::default();
-    if let Err(e) = app.event_loop.listen_for_events() {
-        error!("{:?}", e);
-        process::exit(1);
-    }
     // loads initial controllers into UI on first render
     if let Err(e) = app
         .event_loop
@@ -276,6 +279,10 @@ fn main() {
         "xlogger",
         native_options,
         Box::new(|cc| {
+            if let Err(e) = app.event_loop.listen_for_events(cc.egui_ctx.clone()) {
+                error!("{:?}", e);
+                process::exit(1);
+            }
             cc.egui_ctx.set_visuals(egui::Visuals::dark());
             Box::new(app)
         }),
