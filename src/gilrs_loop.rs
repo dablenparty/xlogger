@@ -67,15 +67,7 @@ impl WriterThread {
     ///
     /// Returns `io::Error` if one occurs while creating the CSV writers.
     fn start(&mut self) -> io::Result<()> {
-        let (mut button_csv_writer, mut stick_csv_writer) =
-            make_csv_writers(&self.file_name_prefix)?;
-
-        let mut time_map: HashMap<gilrs::GamepadId, SystemTime> = HashMap::new();
-
-        let mut left_stick_state = ControllerStickState::default();
-        let mut right_stick_state = ControllerStickState::default();
-
-        let start_time = SystemTime::now();
+        let (button_csv_writer, stick_csv_writer) = make_csv_writers(&self.file_name_prefix)?;
 
         self.should_run.store(true, Ordering::SeqCst);
 
@@ -83,103 +75,7 @@ impl WriterThread {
         let run = self.should_run.clone();
 
         let join_handle = thread::spawn(move || {
-            while run.load(Ordering::SeqCst) {
-                for next_event in thread_channels.rx.try_iter() {
-                    let gilrs::Event {
-                        event,
-                        time: event_time,
-                        id: gamepad_id,
-                    } = next_event;
-                    match event {
-                        EventType::AxisChanged(axis, value, ..) => {
-                            match axis {
-                                Axis::LeftStickX => left_stick_state.x = f64::from(value),
-                                Axis::LeftStickY => left_stick_state.y = f64::from(value),
-                                Axis::RightStickX => right_stick_state.x = f64::from(value),
-                                Axis::RightStickY => right_stick_state.y = f64::from(value),
-                                _ => {
-                                    warn!("unhandled axis event: {:?}", event);
-                                    continue;
-                                }
-                            }
-                            let time = if let Ok(d) = event_time.duration_since(start_time) {
-                                d.as_secs_f64()
-                            } else {
-                                debug!(
-                                    "ignoring old event from {} at {:?}",
-                                    gamepad_id, event_time
-                                );
-                                continue;
-                            };
-                            let stick_event = ControllerStickEvent {
-                                time,
-                                left_x: left_stick_state.x,
-                                left_y: left_stick_state.y,
-                                right_x: right_stick_state.x,
-                                right_y: right_stick_state.y,
-                            };
-                            if let Err(e) = stick_csv_writer.serialize(&stick_event) {
-                                error!(
-                                "failed to write stick event <{:?}> to csv with following error: {:?}",
-                                stick_event, e
-                            );
-                            }
-                            if let Err(e) = stick_csv_writer.flush() {
-                                error!(
-                                "failed to flush stick event <{:?}> to csv with following error: {:?}",
-                                stick_event, e
-                            );
-                            }
-                        }
-                        EventType::ButtonChanged(button, value, ..) => {
-                            if value == 0.0 {
-                                let down_time =
-                                    time_map.remove(&gamepad_id).unwrap_or_else(SystemTime::now);
-                                if down_time < start_time || event_time < start_time {
-                                    debug!(
-                                        "ignoring old event from {} at {:?}",
-                                        gamepad_id, event_time
-                                    );
-                                    continue;
-                                }
-                                // unwrap is safe since time validation is done above
-                                let button_event = ControllerButtonEvent {
-                                    press_time: down_time
-                                        .duration_since(start_time)
-                                        .unwrap()
-                                        .as_secs_f64(),
-                                    release_time: event_time
-                                        .duration_since(start_time)
-                                        .unwrap()
-                                        .as_secs_f64(),
-                                    button,
-                                };
-                                if let Err(e) = button_csv_writer.serialize(&button_event) {
-                                    error!(
-                                "failed to write button event <{:?}> to csv with following error: {:?}",
-                                button_event, e
-                            );
-                                }
-                                if let Err(e) = button_csv_writer.flush() {
-                                    error!(
-                                "failed to flush button event <{:?}> to csv with following error: {:?}",
-                                button_event, e
-                                );
-                                }
-                            } else {
-                                // only insert if it doesn't have a value (aka has the default value)
-                                let map_time_opt = time_map.get(&gamepad_id);
-                                if map_time_opt.unwrap_or(&SystemTime::UNIX_EPOCH)
-                                    == &SystemTime::UNIX_EPOCH
-                                {
-                                    time_map.insert(gamepad_id, event_time);
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
+            inner_writer_start(&run, &thread_channels, stick_csv_writer, button_csv_writer);
         });
         self.thread_handle = Some(join_handle);
         Ok(())
@@ -198,8 +94,112 @@ impl WriterThread {
         }
     }
 
+    /// Returns whether the writer thread is running or not.
     fn is_running(&self) -> bool {
         self.thread_handle.is_some()
+    }
+}
+
+fn inner_writer_start(
+    run: &Arc<AtomicBool>,
+    thread_channels: &CrossbeamChannelPair<gilrs::Event>,
+    mut stick_csv_writer: csv::Writer<File>,
+    mut button_csv_writer: csv::Writer<File>,
+) {
+    // setup
+    let start_time = SystemTime::now();
+    let mut time_map: HashMap<gilrs::GamepadId, SystemTime> = HashMap::new();
+    let mut left_stick_state = ControllerStickState::default();
+    let mut right_stick_state = ControllerStickState::default();
+
+    // event loop
+    while run.load(Ordering::SeqCst) {
+        for next_event in thread_channels.rx.try_iter() {
+            let gilrs::Event {
+                event,
+                time: event_time,
+                id: gamepad_id,
+            } = next_event;
+            match event {
+                EventType::AxisChanged(axis, value, ..) => {
+                    match axis {
+                        Axis::LeftStickX => left_stick_state.x = f64::from(value),
+                        Axis::LeftStickY => left_stick_state.y = f64::from(value),
+                        Axis::RightStickX => right_stick_state.x = f64::from(value),
+                        Axis::RightStickY => right_stick_state.y = f64::from(value),
+                        _ => {
+                            warn!("unhandled axis event: {:?}", event);
+                            continue;
+                        }
+                    }
+                    let time = if let Ok(d) = event_time.duration_since(start_time) {
+                        d.as_secs_f64()
+                    } else {
+                        debug!("ignoring old event from {} at {:?}", gamepad_id, event_time);
+                        continue;
+                    };
+                    let stick_event = ControllerStickEvent {
+                        time,
+                        left_x: left_stick_state.x,
+                        left_y: left_stick_state.y,
+                        right_x: right_stick_state.x,
+                        right_y: right_stick_state.y,
+                    };
+                    if let Err(e) = stick_csv_writer.serialize(&stick_event) {
+                        error!(
+                            "failed to write stick event <{:?}> to csv with following error: {:?}",
+                            stick_event, e
+                        );
+                    }
+                    if let Err(e) = stick_csv_writer.flush() {
+                        error!(
+                            "failed to flush stick event <{:?}> to csv with following error: {:?}",
+                            stick_event, e
+                        );
+                    }
+                }
+                EventType::ButtonChanged(button, value, ..) => {
+                    if value == 0.0 {
+                        let down_time =
+                            time_map.remove(&gamepad_id).unwrap_or_else(SystemTime::now);
+                        if down_time < start_time || event_time < start_time {
+                            debug!("ignoring old event from {} at {:?}", gamepad_id, event_time);
+                            continue;
+                        }
+                        // unwrap is safe since time validation is done above
+                        let button_event = ControllerButtonEvent {
+                            press_time: down_time.duration_since(start_time).unwrap().as_secs_f64(),
+                            release_time: event_time
+                                .duration_since(start_time)
+                                .unwrap()
+                                .as_secs_f64(),
+                            button,
+                        };
+                        if let Err(e) = button_csv_writer.serialize(&button_event) {
+                            error!(
+                        "failed to write button event <{:?}> to csv with following error: {:?}",
+                        button_event, e
+                    );
+                        }
+                        if let Err(e) = button_csv_writer.flush() {
+                            error!(
+                        "failed to flush button event <{:?}> to csv with following error: {:?}",
+                        button_event, e
+                        );
+                        }
+                    } else {
+                        // only insert if it doesn't have a value (aka has the default value)
+                        let map_time_opt = time_map.get(&gamepad_id);
+                        if map_time_opt.unwrap_or(&SystemTime::UNIX_EPOCH)
+                            == &SystemTime::UNIX_EPOCH
+                        {
+                            time_map.insert(gamepad_id, event_time);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 }
 
