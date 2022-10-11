@@ -95,6 +95,7 @@ pub fn get_exe_parent_dir() -> PathBuf {
 /// returns: `String`
 pub fn f64_to_formatted_time(secs: f64) -> String {
     const TIME_FORMAT: &str = "%H:%M:%S";
+    #[allow(clippy::cast_possible_truncation)]
     let datetime = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(secs as i64, 0), Utc)
         .format(TIME_FORMAT)
         .to_string();

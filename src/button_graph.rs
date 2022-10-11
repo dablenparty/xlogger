@@ -97,8 +97,11 @@ impl EguiView for ControllerButtonGraph {
                             "Button: {}\nPressed at: {}\nHeld for: {:.2}s",
                             button_name, pressed_at_string, duration
                         );
+                        // you'll probably run out of memory before enough points get loaded to cause a precision loss
+                        #[allow(clippy::cast_precision_loss)]
+                        let arg = (i + 1) as f64;
                         BoxElem::new(
-                            (i + 1) as f64,
+                            arg,
                             BoxSpread::new(
                                 e.press_time,
                                 e.press_time,

@@ -93,10 +93,10 @@ impl WriterThread {
                     match event {
                         EventType::AxisChanged(axis, value, ..) => {
                             match axis {
-                                Axis::LeftStickX => left_stick_state.x = value as f64,
-                                Axis::LeftStickY => left_stick_state.y = value as f64,
-                                Axis::RightStickX => right_stick_state.x = value as f64,
-                                Axis::RightStickY => right_stick_state.y = value as f64,
+                                Axis::LeftStickX => left_stick_state.x = f64::from(value),
+                                Axis::LeftStickY => left_stick_state.y = f64::from(value),
+                                Axis::RightStickX => right_stick_state.x = f64::from(value),
+                                Axis::RightStickY => right_stick_state.y = f64::from(value),
                                 _ => {
                                     warn!("unhandled axis event: {:?}", event);
                                     continue;
@@ -216,7 +216,7 @@ impl GilrsEventLoop {
         let channels = self.channels.clone();
         let event_channels = self.event_channels.clone();
         self.loop_handle = Some(thread::spawn(move || {
-            inner_listen(&should_run, &channels, &event_channels, egui_ctx);
+            inner_listen(&should_run, &channels, &event_channels, &egui_ctx);
         }));
         Ok(())
     }
@@ -260,7 +260,7 @@ fn inner_listen(
     should_run: &Arc<AtomicBool>,
     channels: &CrossbeamChannelPair<ControllerHighlightEvent>,
     event_channels: &CrossbeamChannelPair<GELEvent>,
-    egui_ctx: eframe::egui::Context,
+    egui_ctx: &eframe::egui::Context,
 ) {
     // if this fails, the event loop can never run
     let mut gilrs = Gilrs::new().expect("failed to initialize controller processor");
@@ -278,109 +278,127 @@ fn inner_listen(
     while should_run.load(Ordering::Relaxed) {
         // get events
         for next_event in event_channels.rx.try_iter() {
-            debug!("got event: {:?}", next_event);
-            match next_event {
-                GELEvent::GetAllControllers => {
-                    gilrs.gamepads().for_each(|(id, gamepad)| {
-                        let connection_event = ControllerConnectionEvent {
-                            connected: true,
-                            controller_id: id,
-                            gamepad_name: gamepad.name().to_string(),
-                        };
-                        if let Err(e) = channels
-                            .tx
-                            .send(ControllerHighlightEvent::ConnectionEvent(connection_event))
-                        {
-                            error!(
-                                "Error sending controller connection to main thread: {:?}",
-                                e
-                            );
-                        }
-                    });
-                }
-                GELEvent::StartRecording => {
-                    for (gamepad_id, writer_thread) in &mut writer_thread_map {
-                        if let Err(e) = writer_thread.start() {
-                            warn!("Error starting writer thread: {:?}", e);
-                        }
-                        info!("started recording gamepad {}", gamepad_id);
-                    }
-                }
-                GELEvent::StopRecording => {
-                    for (gamepad_id, writer_thread) in &mut writer_thread_map {
-                        writer_thread.stop();
-                        info!("stopped recording gamepad {}", gamepad_id);
-                    }
-                }
-            }
+            handle_gel_event(&next_event, &gilrs, channels, &mut writer_thread_map);
         }
         while let Some(event) = gilrs.next_event() {
-            let gilrs::Event {
-                event: event_type,
-                id: gamepad_id,
-                ..
-            } = event;
-            match event_type {
-                EventType::AxisChanged(_, value, _) | EventType::ButtonChanged(_, value, _) => {
-                    if let Some(writer_thread) = writer_thread_map.get_mut(&gamepad_id) {
-                        if let Err(e) = writer_thread.channels.tx.send(event) {
-                            warn!("Error sending event to writer thread: {:?}", e);
-                        }
-                    }
-                    let highlight_event = if value == 0.0 {
-                        ControllerHighlightEvent::Unhighlight(gamepad_id)
-                    } else {
-                        ControllerHighlightEvent::Highlight(gamepad_id)
-                    };
-                    if let Err(e) = channels.tx.send(highlight_event) {
-                        error!("Error sending controller highlight to main thread: {:?}", e);
-                    }
-                    // without this, the GUI doesn't update and the controller highlight doesn't
-                    // change properly (egui is pretty smart about repaints)
-                    eframe::egui::Context::request_repaint(&egui_ctx);
-                }
-                EventType::Connected | EventType::Disconnected => {
-                    let connected = matches!(event_type, EventType::Connected);
-                    let gamepad = gilrs.gamepad(gamepad_id);
-                    if connected {
-                        // this shouldn't happen, but just in case
-                        if let Some(existing_writer_thread) = writer_thread_map.get_mut(&gamepad_id)
-                        {
-                            existing_writer_thread.stop();
-                        }
-                        let writer_thread = WriterThread {
-                            file_name_prefix: make_controller_name_prefix(gamepad),
-                            ..Default::default()
-                        };
-                        writer_thread_map.insert(gamepad_id, writer_thread);
-                    } else if let Some(mut writer_thread) = writer_thread_map.remove(&gamepad_id) {
-                        writer_thread.stop();
-                    }
-
-                    let gamepad_name = gamepad.name().to_string();
-                    let connection_event = ControllerConnectionEvent {
-                        connected,
-                        controller_id: gamepad_id,
-                        gamepad_name,
-                    };
-                    if let Err(e) = channels
-                        .tx
-                        .send(ControllerHighlightEvent::ConnectionEvent(connection_event))
-                    {
-                        error!(
-                            "failed to send connection event for gamepad <{:?}> to channel with following error: {:?}",
-                            gamepad_id, e
-                        );
-                    }
-                }
-                _ => {}
-            }
+            handle_gilrs_event(event, &mut writer_thread_map, channels, egui_ctx, &gilrs);
         }
     }
     // stop the writer thread
     for (gamepad_id, writer_thread) in &mut writer_thread_map {
         info!("stopping recording for gamepad {:?}", gamepad_id);
         writer_thread.stop();
+    }
+}
+
+fn handle_gilrs_event(
+    event: gilrs::Event,
+    writer_thread_map: &mut HashMap<gilrs::GamepadId, WriterThread>,
+    channels: &CrossbeamChannelPair<ControllerHighlightEvent>,
+    egui_ctx: &eframe::egui::Context,
+    gilrs: &Gilrs,
+) {
+    let gilrs::Event {
+        event: event_type,
+        id: gamepad_id,
+        ..
+    } = event;
+    match event_type {
+        EventType::AxisChanged(_, value, _) | EventType::ButtonChanged(_, value, _) => {
+            if let Some(writer_thread) = writer_thread_map.get_mut(&gamepad_id) {
+                if let Err(e) = writer_thread.channels.tx.send(event) {
+                    warn!("Error sending event to writer thread: {:?}", e);
+                }
+            }
+            let highlight_event = if value == 0.0 {
+                ControllerHighlightEvent::Unhighlight(gamepad_id)
+            } else {
+                ControllerHighlightEvent::Highlight(gamepad_id)
+            };
+            if let Err(e) = channels.tx.send(highlight_event) {
+                error!("Error sending controller highlight to main thread: {:?}", e);
+            }
+            // without this, the GUI doesn't update and the controller highlight doesn't
+            // change properly (egui is pretty smart about repaints)
+            eframe::egui::Context::request_repaint(egui_ctx);
+        }
+        EventType::Connected | EventType::Disconnected => {
+            let connected = matches!(event_type, EventType::Connected);
+            let gamepad = gilrs.gamepad(gamepad_id);
+            if connected {
+                // this shouldn't happen, but just in case
+                if let Some(existing_writer_thread) = writer_thread_map.get_mut(&gamepad_id) {
+                    existing_writer_thread.stop();
+                }
+                let writer_thread = WriterThread {
+                    file_name_prefix: make_controller_name_prefix(gamepad),
+                    ..Default::default()
+                };
+                writer_thread_map.insert(gamepad_id, writer_thread);
+            } else if let Some(mut writer_thread) = writer_thread_map.remove(&gamepad_id) {
+                writer_thread.stop();
+            }
+
+            let gamepad_name = gamepad.name().to_string();
+            let connection_event = ControllerConnectionEvent {
+                connected,
+                controller_id: gamepad_id,
+                gamepad_name,
+            };
+            if let Err(e) = channels
+                .tx
+                .send(ControllerHighlightEvent::ConnectionEvent(connection_event))
+            {
+                error!(
+                    "failed to send connection event for gamepad <{:?}> to channel with following error: {:?}",
+                    gamepad_id, e
+                );
+            }
+        }
+        _ => {}
+    }
+}
+
+fn handle_gel_event(
+    next_event: &GELEvent,
+    gilrs: &Gilrs,
+    channels: &CrossbeamChannelPair<ControllerHighlightEvent>,
+    writer_thread_map: &mut HashMap<gilrs::GamepadId, WriterThread>,
+) {
+    debug!("got event: {:?}", next_event);
+    match next_event {
+        GELEvent::GetAllControllers => {
+            gilrs.gamepads().for_each(|(id, gamepad)| {
+                let connection_event = ControllerConnectionEvent {
+                    connected: true,
+                    controller_id: id,
+                    gamepad_name: gamepad.name().to_string(),
+                };
+                if let Err(e) = channels
+                    .tx
+                    .send(ControllerHighlightEvent::ConnectionEvent(connection_event))
+                {
+                    error!(
+                        "Error sending controller connection to main thread: {:?}",
+                        e
+                    );
+                }
+            });
+        }
+        GELEvent::StartRecording => {
+            for (gamepad_id, writer_thread) in writer_thread_map {
+                if let Err(e) = writer_thread.start() {
+                    warn!("Error starting writer thread: {:?}", e);
+                }
+                info!("started recording gamepad {}", gamepad_id);
+            }
+        }
+        GELEvent::StopRecording => {
+            for (gamepad_id, writer_thread) in writer_thread_map {
+                writer_thread.stop();
+                info!("stopped recording gamepad {}", gamepad_id);
+            }
+        }
     }
 }
 

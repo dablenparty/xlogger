@@ -1,3 +1,4 @@
+#![warn(clippy::all, clippy::pedantic)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use std::{collections::HashMap, fs::File, process};
@@ -11,7 +12,7 @@ use simplelog::{Config, WriteLogger};
 use xlogger::{
     button_graph::ControllerButtonGraph,
     error_window::ErrorWindow,
-    gilrs_loop::{GELEvent, GilrsEventLoop},
+    gilrs_loop::{ControllerHighlightEvent, GELEvent, GilrsEventLoop},
     open_dialog_in_data_folder,
     stick_graph::ControllerStickGraph,
     util::{create_dir_if_not_exists, get_exe_parent_dir},
@@ -77,29 +78,7 @@ impl eframe::App for XloggerApp {
             let start_button_text = if self.event_loop_is_recording { "Stop" } else { "Start" };
             ui.horizontal(|ui| {
                 if ui.button(start_button_text).clicked() {
-                    // don't allow starting if there are no controllers (until hotplugging is implemented)
-                    if self.connected_controllers.is_empty() {
-                        self.saved_text.text = "No controllers connected!".to_string();
-                        self.saved_text.state = xlogger::TextState::Warning;
-                        return;
-                    }
-                    let (log_message, saved_text) = if self.event_loop_is_recording {
-                        self.event_loop_is_recording = false;
-                        if let Err(e) = self.event_loop.event_channels.tx.send(GELEvent::StopRecording) {
-                            error!("Failed to send stop recording event: {:?}", e);
-                            self.open_views.push((true, Box::new(ErrorWindow::new(e))));
-                        }
-                        ("stopped listening to controllers", "Saved!".to_owned())
-                    } else {
-                        self.event_loop_is_recording = true;
-                        if let Err(e) = self.event_loop.event_channels.tx.send(GELEvent::StartRecording) {
-                            error!("Failed to send start recording event: {:?}", e);
-                            self.open_views.push((true, Box::new(ErrorWindow::new(e))));
-                        }
-                        ("started listening to controllers", "".to_owned())
-                    };
-                    self.saved_text.text = saved_text;
-                    info!("{}", log_message);
+                    self.handle_start_clicked();
                 }
                 self.saved_text.show(ui);
             });
@@ -129,35 +108,14 @@ impl eframe::App for XloggerApp {
                     }
                 }
             });
-            // TODO: make event type an enum, highlight controller in list on input
-            for e in self.event_loop.channels.rx.try_iter() {
-                match e {
-                    xlogger::gilrs_loop::ControllerHighlightEvent::Highlight(id) => {
-                        if let Some((_, color)) = self.connected_controllers.get_mut(&id) {
-                            *color = Color32::WHITE;
-                        }
-                    },
-                    xlogger::gilrs_loop::ControllerHighlightEvent::Unhighlight(id) => {
-                        if let Some((_, color)) = self.connected_controllers.get_mut(&id) {
-                            *color = Color32::GRAY;
-                        }
-                    },
-                    xlogger::gilrs_loop::ControllerHighlightEvent::ConnectionEvent(e) => {
-                        if e.connected {
-                            self.connected_controllers.insert(e.controller_id, (e.gamepad_name, Color32::GRAY));
-                        } else {
-                            self.connected_controllers.remove(&e.controller_id);
-                        }
-                    },
-                }
-            }
+            self.handle_highlight_event();
             ui.vertical(|ui| {
                 ui.label(format!(
                     "Connected controllers: {}",
                     self.connected_controllers.len()
                 ));
                 for (id, (name, color)) in &self.connected_controllers {
-                    ui.colored_label(color.to_owned(), format!("[{}] {}", id, name));
+                    ui.colored_label(*color, format!("[{}] {}", id, name));
                 }
             });
             self.open_views.retain(|(show_view, _)| *show_view);
@@ -165,6 +123,76 @@ impl eframe::App for XloggerApp {
                 view.show(ctx, show_view);
             });
         });
+    }
+}
+
+impl XloggerApp {
+    /// Handles the start button being clicked
+    ///
+    /// If the event loop is not recording, it starts recording. Otherwise, it stops recording.
+    fn handle_start_clicked(&mut self) {
+        if self.connected_controllers.is_empty() {
+            self.saved_text.text = "No controllers connected!".to_string();
+            self.saved_text.state = xlogger::TextState::Warning;
+            return;
+        }
+        let (log_message, saved_text) = if self.event_loop_is_recording {
+            self.event_loop_is_recording = false;
+            if let Err(e) = self
+                .event_loop
+                .event_channels
+                .tx
+                .send(GELEvent::StopRecording)
+            {
+                error!("Failed to send stop recording event: {:?}", e);
+                self.open_views.push((true, Box::new(ErrorWindow::new(e))));
+            }
+            ("stopped listening to controllers", "Saved!".to_owned())
+        } else {
+            self.event_loop_is_recording = true;
+            if let Err(e) = self
+                .event_loop
+                .event_channels
+                .tx
+                .send(GELEvent::StartRecording)
+            {
+                error!("Failed to send start recording event: {:?}", e);
+                self.open_views.push((true, Box::new(ErrorWindow::new(e))));
+            }
+            ("started listening to controllers", "".to_owned())
+        };
+        self.saved_text.text = saved_text;
+        info!("{}", log_message);
+    }
+
+    /// Handles all `ControllerHighlightEvent`'s by reading/updating the `connected_controllers` map.
+    ///
+    /// If the event is a `ControllerHighlightEvent::ConnectionEvent`, the controller is added to or removed from the map.
+    /// If the event is a `ControllerHighlightEvent::Highlight`, the controller is highlighted in the GUI.
+    /// If the event is a `ControllerHighlightEvent::Unhighlight`, the controller is unhighlighted in the GUI.
+    fn handle_highlight_event(&mut self) {
+        for event in self.event_loop.channels.rx.try_iter() {
+            match event {
+                ControllerHighlightEvent::Highlight(id) => {
+                    if let Some((_, color)) = self.connected_controllers.get_mut(&id) {
+                        *color = Color32::WHITE;
+                    }
+                }
+                ControllerHighlightEvent::Unhighlight(id) => {
+                    if let Some((_, color)) = self.connected_controllers.get_mut(&id) {
+                        *color = Color32::GRAY;
+                    }
+                }
+                ControllerHighlightEvent::ConnectionEvent(e) => {
+                    if e.connected {
+                        self.connected_controllers
+                            .insert(e.controller_id, (e.gamepad_name, Color32::GRAY));
+                    } else {
+                        self.connected_controllers.remove(&e.controller_id);
+                    }
+                }
+            }
+        }
     }
 }
 
