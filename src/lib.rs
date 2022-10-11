@@ -1,3 +1,12 @@
+#![warn(clippy::all, clippy::pedantic)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::similar_names
+)]
+
 use std::path::PathBuf;
 
 use eframe::{
