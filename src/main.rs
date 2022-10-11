@@ -131,11 +131,17 @@ impl eframe::App for XloggerApp {
             });
             // TODO: make event type an enum, highlight controller in list on input
             for e in self.event_loop.channels.rx.try_iter() {
-                if e.connected {
-                    self.connected_controllers.push(e);
-                } else {
-                    self.connected_controllers
-                        .retain(|c| c.controller_id != e.controller_id);
+                match e {
+                    xlogger::gilrs_loop::ControllerHighlightEvent::Highlight(_) => todo!(),
+                    xlogger::gilrs_loop::ControllerHighlightEvent::Unhighlight(_) => todo!(),
+                    xlogger::gilrs_loop::ControllerHighlightEvent::ConnectionEvent(e) => {
+                        if e.connected {
+                            self.connected_controllers.push(e);
+                        } else {
+                            self.connected_controllers
+                            .retain(|c| c.controller_id != e.controller_id);
+                        }
+                    },
                 }
             }
             ui.vertical(|ui| {

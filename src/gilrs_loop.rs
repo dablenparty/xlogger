@@ -28,9 +28,15 @@ pub enum GELEvent {
     StopRecording,
 }
 
+pub enum ControllerHighlightEvent {
+    Highlight(gilrs::GamepadId),
+    Unhighlight(gilrs::GamepadId),
+    ConnectionEvent(ControllerConnectionEvent),
+}
+
 #[derive(Default)]
 pub struct GilrsEventLoop {
-    pub channels: CrossbeamChannelPair<ControllerConnectionEvent>,
+    pub channels: CrossbeamChannelPair<ControllerHighlightEvent>,
     pub event_channels: CrossbeamChannelPair<GELEvent>,
     should_run: Arc<AtomicBool>,
     loop_handle: Option<JoinHandle<()>>,
@@ -248,7 +254,7 @@ fn make_csv_writers(prefix: &str) -> io::Result<(csv::Writer<File>, csv::Writer<
 
 fn inner_listen(
     should_run: &Arc<AtomicBool>,
-    channels: &CrossbeamChannelPair<ControllerConnectionEvent>,
+    channels: &CrossbeamChannelPair<ControllerHighlightEvent>,
     event_channels: &CrossbeamChannelPair<GELEvent>,
 ) {
     // if this fails, the event loop can never run
@@ -271,11 +277,15 @@ fn inner_listen(
             match next_event {
                 GELEvent::GetAllControllers => {
                     gilrs.gamepads().for_each(|(id, gamepad)| {
-                        if let Err(e) = channels.tx.send(ControllerConnectionEvent {
+                        let connection_event = ControllerConnectionEvent {
                             connected: true,
                             controller_id: id,
                             gamepad_name: gamepad.name().to_string(),
-                        }) {
+                        };
+                        if let Err(e) = channels
+                            .tx
+                            .send(ControllerHighlightEvent::ConnectionEvent(connection_event))
+                        {
                             error!(
                                 "Error sending controller connection to main thread: {:?}",
                                 e
@@ -337,7 +347,7 @@ fn inner_listen(
                         controller_id: gamepad_id,
                         gamepad_name,
                     };
-                    if let Err(e) = channels.tx.send(connection_event) {
+                    if let Err(e) = channels.tx.send(ControllerHighlightEvent::ConnectionEvent(connection_event)) {
                         error!(
                             "failed to send connection event for gamepad <{:?}> to channel with following error: {:?}",
                             gamepad_id, e
