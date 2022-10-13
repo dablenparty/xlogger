@@ -4,14 +4,12 @@ The keylogger for controllers
 
 ## Platforms
 
-Below are the platforms I have tested xlogger on:
-
 - Windows
   - Developed on Windows 10/11, for Windows 10/11.
-- MacOS?
-  - Manually tested on MacOS Monterey, installed via dmg.
+- macOS
+  - Manually tested on macOS Monterey using an Intel mac.
 - Linux\*
-  - I have managed to get this working on Ubuntu 22.04. If you are building yourself, see [Build instructions](#build-instructions).
+  - I have managed to get this working on Ubuntu 22.04 which is what the binary is for on the Releases page. If you are building yourself, see [Build instructions](#build-instructions).
 
 ## Installation
 
