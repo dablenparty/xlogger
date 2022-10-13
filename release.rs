@@ -54,7 +54,9 @@ fn main() -> io::Result<()> {
 
 #[cfg(any(windows, target_os = "linux"))]
 fn main() -> io::Result<()> {
-    let xlogger_target = format!("target/release/{}/{}", std::env::consts::OS, PACKAGE_NAME);
+    use std::env;
+
+    let xlogger_target = format!("target/release/{}/{}", env::consts::OS, PACKAGE_NAME);
     let executable_name = format!("{}{}", PACKAGE_NAME, EXE_SUFFIX);
     println!("building {}", executable_name);
     // compile in release
@@ -65,7 +67,14 @@ fn main() -> io::Result<()> {
     fs::create_dir_all(&xlogger_target)?;
     fs::copy(
         format!("target/release/{}", executable_name),
-        format!("{}/{}", xlogger_target, executable_name),
+        format!(
+            "{}/{}_{}_{}{}",
+            xlogger_target,
+            PACKAGE_NAME,
+            env::consts::OS,
+            env::consts::ARCH,
+            EXE_SUFFIX
+        ),
     )?;
     Ok(())
 }
