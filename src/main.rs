@@ -3,12 +3,14 @@
 
 use std::{collections::HashMap, fs::File, process};
 
+use eframe::egui::{Ui, WidgetText};
 use eframe::{egui, epaint::Color32, IconData};
 use human_panic::setup_panic;
 #[cfg(windows)]
 use image::ImageResult;
 use log::{error, info, warn, LevelFilter};
 use simplelog::{Config, WriteLogger};
+
 use xlogger::{
     button_graph::ControllerButtonGraph,
     error_window::ErrorWindow,
@@ -83,30 +85,8 @@ impl eframe::App for XloggerApp {
                 self.saved_text.show(ui);
             });
             ui.horizontal(|ui| {
-                if ui.button("Visualize Sticks").clicked() {
-                    // opens to the data folder
-                    // if it doesn't exist, RFD defaults to the Documents folder
-                    if let Some(path) = open_dialog_in_data_folder() {
-                        let mut graph = ControllerStickGraph::default();
-                        if let Err(e) = graph.load(path) {
-                            error!("{:?}", e);
-                            self.open_views.push((true, Box::new(ErrorWindow::new(e))));
-                        } else {
-                            self.open_views.push((true, Box::new(graph)));
-                        }
-                    }
-                };
-                if ui.button("Visualize Buttons").clicked() {
-                    if let Some(path) = open_dialog_in_data_folder() {
-                        let mut graph = ControllerButtonGraph::default();
-                        if let Err(e) = graph.load(path) {
-                            error!("{:?}", e);
-                            self.open_views.push((true, Box::new(ErrorWindow::new(e))));
-                        } else {
-                            self.open_views.push((true, Box::new(graph)));
-                        }
-                    }
-                }
+                self.make_graph_button::<ControllerStickGraph>(ui, "Visualize Sticks");
+                self.make_graph_button::<ControllerButtonGraph>(ui, "Visualize Buttons");
             });
             self.handle_highlight_event();
             ui.vertical(|ui| {
@@ -127,6 +107,34 @@ impl eframe::App for XloggerApp {
 }
 
 impl XloggerApp {
+    /// Makes a button that will open a file dialog and, if a file is selected,
+    /// open a graph view for that file.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI to add the button to
+    /// * `text` - The text to display on the button
+    ///
+    /// # Type Parameters
+    ///
+    /// * `G` - The type of graph to open
+    fn make_graph_button<G>(&mut self, ui: &mut Ui, text: impl Into<WidgetText>)
+    where
+        G: CsvLoad + Default + EguiView + 'static,
+    {
+        if ui.button(text).clicked() {
+            if let Some(path) = open_dialog_in_data_folder() {
+                let mut graph = G::default();
+                if let Err(e) = graph.load(path) {
+                    error!("{:?}", e);
+                    self.open_views.push((true, Box::new(ErrorWindow::new(e))));
+                } else {
+                    self.open_views.push((true, Box::new(graph)));
+                }
+            }
+        }
+    }
+
     /// Handles the start button being clicked
     ///
     /// If the event loop is not recording, it starts recording. Otherwise, it stops recording.
