@@ -16,7 +16,7 @@ The keylogger for controllers
 - Windows/MacOS:
   - Download the installer for your system and run it.
 - Linux
-  - For now, you need to build xlogger yourself from source. See [Build instructions](#build-instructions).
+  - For now, if you're not on Ubuntu you need to build xlogger yourself from source. See [Build instructions](#build-instructions).
 
 ## Usage
 
@@ -26,7 +26,7 @@ This is a GUI program can be run like any other. Previous versions of this progr
 
 ### Current
 
-As of the last commit to this file, `xlogger` can log data from multiple controllers at once. However, it's limited by XInput and SDL2 (I missed this in the gilrs docs before). This does _not_ include all controllers, most notably the PS5 controller.
+As of the last commit to this file, `xlogger` can log data from multiple controllers at once. However, it's limited by xInput and SDL2 (I missed this in the gilrs docs before). This does _not_ include all controllers, most notably the PS5 controller. Recently, gilrs had an [update](https://gitlab.com/gilrs-project/gilrs/-/blob/master/gilrs/CHANGELOG.md#v0100-2022-11-06) that switched away from xInput on Windows; however, there is a glaring limitation. Per the linked changelog, "Apps on Windows will now require a focused window to receive inputs by default." This defeats the entire purpose of this program, so I'm forced to stick with xInput until this either changes or I can find a way around it (which is extremely unlikely).
 
 ## Build instructions
 
