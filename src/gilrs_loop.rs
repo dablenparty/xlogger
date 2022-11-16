@@ -229,7 +229,7 @@ impl GilrsEventLoop {
         if self.loop_handle.is_some() {
             return Err(GilrsEventLoopError::NoLoopHandle);
         }
-        self.should_run.store(true, Ordering::Relaxed);
+        self.should_run.store(true, Ordering::SeqCst);
         let should_run = self.should_run.clone();
         let channels = self.channels.clone();
         let event_channels = self.event_channels.clone();
@@ -241,7 +241,7 @@ impl GilrsEventLoop {
 
     /// Returns whether the event loop is currently running.
     pub fn is_running(&self) -> bool {
-        self.loop_handle.is_some() && self.should_run.load(Ordering::Relaxed)
+        self.loop_handle.is_some() && self.should_run.load(Ordering::SeqCst)
     }
 
     /// Stops the event loop. This will block until the event loop has stopped.
@@ -249,7 +249,7 @@ impl GilrsEventLoop {
         if self.loop_handle.is_none() || !self.is_running() {
             return;
         }
-        self.should_run.store(false, Ordering::Relaxed);
+        self.should_run.store(false, Ordering::SeqCst);
         if let Err(e) = self.loop_handle.take().unwrap().join() {
             error!("{:?}", e);
         }
@@ -293,7 +293,7 @@ fn inner_listen(
         writer_thread_map.insert(gamepad_id, writer_thread);
     });
 
-    while should_run.load(Ordering::Relaxed) {
+    while should_run.load(Ordering::SeqCst) {
         // get events
         for next_event in event_channels.rx.try_iter() {
             handle_gel_event(&next_event, &gilrs, channels, &mut writer_thread_map);
